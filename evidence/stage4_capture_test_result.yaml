@@ -1,0 +1,19 @@
+test_result:
+  schema_version: 1
+  source_revision: "8f852b688e703e9136f9b4fd9a733229bbe697bc"
+  artifact_checksums:
+    jcan_mcp.py: "52c038baeff7e74d81f7478fa00922c99d123c0df71646716f995ccc8b437d26"
+    test_jcan_mcp.py: "bb6827c8a5c716a6fb6ca48be9432079e2efe7f15c0cd545ab668bb028149956"
+    jcan_bus_profile.toml: "25dd865cfe573c58d4fca8aea69792d418c23a8518ad697ba06eb08f5edf1b3f"
+  safety_preflight: "evidence/stage4_capture_preflight.yaml"
+  level: "hil"
+  target: "MCP stdio -> JTool-CAN ffff:0004 serial 207F346D5650 -> physical CANopen bus"
+  command: "JCAN_STAGE4_CAPTURE_SERIAL=207F346D5650 JCAN_EVIDENCE_DIR=evidence/runtime .venv/bin/python -m unittest -v test_jcan_mcp.McpStage4CaptureHilTest"
+  timing: {started_at_utc: "2026-09-02T10:07:37Z", duration_ms: 5442, timeout_ms: 30000}
+  attempts: 1
+  passed: true
+  counts: {total: 1, passed: 1, failed: 0, skipped: 0}
+  classified_failures: []
+  log: "evidence/stage4_capture_validation.md"
+  coverage: "Profile and device-config gate, MCP jcan_capture entry point, CAN_MODE_SILENT, duration/frame bounds, CANStop/USB close, postflight device/config verification"
+  requirements: ["JCAN-CAPTURE-PHYSICAL-ENTRYPOINT", "JCAN-CAPTURE-BOUNDED", "JCAN-PHYSICAL-CLEANUP"]

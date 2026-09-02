@@ -1,0 +1,29 @@
+release_evidence:
+  schema_version: 1
+  version: "stage-4-functional-closure-busoff-deferred"
+  source_revision: "8f852b688e703e9136f9b4fd9a733229bbe697bc"
+  safety_preflights:
+    - "evidence/stage4_capture_preflight.yaml"
+    - "evidence/stage4_periodic_50ms_60s_preflight.yaml"
+    - "evidence/stage4_periodic_50ms_1500_preflight.yaml"
+  build_outputs: []
+  deployments: []
+  debug_sessions: []
+  runtime_monitors: []
+  bus_validations:
+    - "evidence/stage4_capture_bus_validation.yaml"
+    - "evidence/stage4_canopen_bus_validation.yaml"
+    - "evidence/stage4_periodic_50ms_60s_bus_validation.yaml"
+    - "evidence/stage4_periodic_50ms_1500_bus_validation.yaml"
+  tests:
+    - "evidence/stage4_closure_host_test_result.yaml"
+    - "evidence/stage4_stdio_stability_test_result.yaml"
+    - "evidence/stage4_capture_test_result.yaml"
+    - "evidence/stage4_periodic_50ms_60s_test_result.yaml"
+    - "evidence/stage4_periodic_50ms_1500_test_result.yaml"
+  reviews:
+    - "AGENT_INTEGRATION_PLAN.md"
+    - "JCAN_API.md"
+    - "evidence/stage4_closure_validation.md"
+    - "evidence/stage4_capture_validation.md"
+    - "evidence/stage4_busoff_deferred.md"

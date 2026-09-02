@@ -1,7 +1,7 @@
 # JCAN Agent Skill + MCP 实施计划
 
 日期：2026-09-02  
-状态：阶段 1–3 已完成；阶段 4 周期任务实现及指定的两项物理 HIL 已完成，物理周期授权已恢复关闭
+状态：阶段 1–4 功能闭环；Bus-Off 故障注入因缺少外部设备延期，物理周期授权保持关闭
 
 ## 目标与结论
 
@@ -95,7 +95,7 @@ MCP Server 退出时必须停止 CAN、取消周期任务并关闭 USB handle。
 - Fake USB 测试覆盖成功、拒绝、超时、短回复和恢复失败。
 - 真机配置往返后与操作前逐字节一致。
 
-### 4. 增加抓包和周期任务（部分完成）
+### 4. 增加抓包和周期任务（功能闭环，Bus-Off 延期）
 
 已实现默认拒绝的 `jcan_bus_profile.toml`。只有 `enabled=true`、`approved=true`、
 序列号/设备原始配置匹配且帧命中白名单后，物理工具才可访问 USB。当前仓库
@@ -126,9 +126,10 @@ profile 至少包含：适配器序列号、nominal/data bitrate、CAN-FD 标准
 
 验收：
 
-- 先在 silent-loopback 下验证启停、取消和抖动统计。
-- 再按安全预检在物理总线验证允许帧、bitrate 和错误状态。
-- 未匹配 profile 的发送请求必须在 USB 写入前拒绝。
+- Host/Fake-CAN 已验证启停、取消、抖动统计、四任务上限、第五任务拒绝和 stdio 断连清理。
+- 物理总线已验证允许帧、500 kbit/s、真实 CANopen 节点响应、周期抖动和有界 silent 抓包。
+- 未匹配 profile 的发送请求在 USB 写入前拒绝。
+- Bus-Off/错误状态故障注入因缺少主动故障设备或分析仪延期，不声明通过。
 
 ### 5. 创建 JCAN Skill
 
@@ -175,12 +176,12 @@ Skill 只记录 Agent 真正需要的决策：
 | MCP contract | 工具 schema、结构化错误、超时、取消、stdio 退出清理 |
 | Fake USB | 断开、超时、短包、拒绝、配置恢复失败 |
 | HIL/internal | 扫描、silent-loopback、配置往返、重启、周期任务停止 |
-| Physical bus | bitrate、CAN/CAN-FD、允许 ID/DLC、周期抖动、Bus-Off |
+| Physical bus | bitrate、当前 profile 的经典 CAN、允许 ID/DLC、周期抖动；Bus-Off 延期 |
 | Skill | 路由准确、安全顺序、证据输出、授权边界 |
 
 ## 复审结果
 
-结论：**有条件通过**。
+结论：**阶段 1–4 功能验收通过；Bus-Off 故障注入延期**。
 
 通过项：
 
@@ -202,4 +203,7 @@ Skill 只记录 Agent 真正需要的决策：
 白名单单帧发送、CANopen SDO 和有界周期调度的 host/Fake CAN 验证，并完成真机节点
 端到端 SDO HIL，并完成 50 ms/60 秒/1200 帧和 50 ms/1500 帧两项真机周期测试；
 2700 次 Download 均收到合法节点响应，零丢期，测试前后对象值保持 200。测试完成后
-物理 profile 已恢复 `periodic=false`。该验收不替代示波器级物理层诊断。
+物理 profile 已恢复 `periodic=false`。补充验证覆盖四任务上限、第五任务拒绝、活动任务下
+stdio 断连后的 CANStop/USB close，以及一次 5 秒真机 silent 抓包；抓包期间总线无自然帧，
+工具仍按上限退出且适配器配置保持不变。Bus-Off/错误状态故障注入等待具备主动故障设备
+或分析仪后单独执行；该验收不替代示波器级物理层诊断。

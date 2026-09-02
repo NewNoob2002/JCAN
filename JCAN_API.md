@@ -68,5 +68,6 @@ MCP 已实现 `jcan_periodic_start/list/stop`：使用一个持久 CAN 会话和
 - 2026-09-02 阶段 4 初始 host 验证：默认拒绝 TOML profile、有界 silent 抓包和精确白名单单帧发送通过；当时物理参数尚未填写。
 - 2026-09-02 阶段 4 profile 已修正为 500 kbit/s 经典 CAN 标准 TX、ID 0x7FF、DLC 4、payload 00000000；一次 MCP 物理发送请求通过，尚无独立接收/ACK 证据。
 - 2026-09-02 CANopen Node-ID 0x01 对象 0x2008:00 完成 Upload、同值 Download 和回读，真实节点端到端响应通过。
-- 2026-09-02 周期调度 host/Fake-CAN 验证通过：绝对截止时间、丢期跳过、显式停止、退出清理、USB 独占和 `periodic=true` 默认拒绝门控均覆盖；物理周期 HIL 尚未授权。
+- 2026-09-02 周期调度 host/Fake-CAN 验证通过：绝对截止时间、丢期跳过、显式停止、四任务上限、第五任务拒绝、stdio 断连清理、USB 独占和 `periodic=true` 默认拒绝门控均覆盖。
 - 2026-09-02 物理周期 HIL：Node 0x01 对象 0x2008:00 同值 Download，50 ms/1200 帧和 50 ms/1500 帧共 2700 次均收到 SDO 成功响应，零丢期；最大调度抖动分别为 2.909 ms、2.881 ms，测试后 profile 恢复 `periodic=false`。
+- 2026-09-02 `jcan_capture` 真机 silent 验证：5.001 秒内总线无自然帧，工具按时退出并完成 CANStop/USB close，适配器在线且八项 profile 配置不变。Bus-Off 故障注入因缺少主动故障设备或分析仪延期。

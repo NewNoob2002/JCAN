@@ -1,0 +1,17 @@
+test_result:
+  schema_version: 1
+  source_revision: "8f852b688e703e9136f9b4fd9a733229bbe697bc"
+  artifact_checksums:
+    jcan_mcp.py: "52c038baeff7e74d81f7478fa00922c99d123c0df71646716f995ccc8b437d26"
+    test_jcan_mcp.py: "bb6827c8a5c716a6fb6ca48be9432079e2efe7f15c0cd545ab668bb028149956"
+  level: "integration"
+  target: "Linux host + MCP stdio subprocess"
+  command: ".venv/bin/python -m unittest -q test_jcan_mcp.McpStdioTest.test_tools_and_self_test"
+  timing: {started_at_utc: "2026-09-02T10:09:00Z", duration_ms: 2232, timeout_ms: 30000}
+  attempts: 5
+  passed: true
+  counts: {total: 5, passed: 5, failed: 0, skipped: 0}
+  classified_failures: []
+  log: "evidence/stage4_closure_validation.md"
+  coverage: "Five consecutive MCP stdio initialize/list/call/shutdown cycles"
+  requirements: ["JCAN-MCP-STDIO-STABILITY"]
