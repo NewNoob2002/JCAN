@@ -1,7 +1,7 @@
 # JCAN Agent Skill + MCP 实施计划
 
 日期：2026-09-02  
-状态：阶段 1–3 已完成；阶段 4 CANopen 节点端到端物理 HIL 已通过，周期任务待定
+状态：阶段 1–3 已完成；阶段 4 周期任务实现及 host/Fake-CAN 验证已完成，物理周期 HIL 待显式授权
 
 ## 目标与结论
 
@@ -112,10 +112,7 @@ SDO Upload → 同值 Download → Upload 回读，驱动器返回合法 `0x581`
 - `jcan_bus_profile_status`：只读检查 profile 与安全门状态。
 - `jcan_sdo_read`：仅允许 profile 明确列出的 expedited SDO Upload。
 - `jcan_sdo_u16_same_value_test`：读取 U16 基线、仅写回同值并立即回读，不保存 EEPROM。
-
-待实现：
-
-- `jcan_periodic_start`、`jcan_periodic_list`、`jcan_periodic_stop`：服务内部调度，不由 Agent 重复调用单帧工具。
+- `jcan_periodic_start`、`jcan_periodic_list`、`jcan_periodic_stop`：服务内部持久 CAN 会话调度；任务必须有明确帧数上限并由 profile 单独设置 `periodic=true`。
 
 profile 至少包含：适配器序列号、nominal/data bitrate、CAN-FD 标准、允许 ID/方向/DLC、最小周期、最大任务数和清理状态。
 
@@ -125,6 +122,7 @@ profile 至少包含：适配器序列号、nominal/data bitrate、CAN-FD 标准
 - 默认丢期后跳过过期实例，不补发突发帧。
 - 每个任务记录 planned/actual 时间和抖动。
 - MCP 断开或进程退出时停止全部周期任务。
+- 周期会话独占适配器；运行期间其他硬件工具默认拒绝，避免并发使用同一 USB handle。
 
 验收：
 
@@ -201,5 +199,6 @@ Skill 只记录 Agent 真正需要的决策：
 6. 所有退出路径必须停止 CAN、周期任务并关闭 USB。
 
 阶段 1–3 已满足以上条件。阶段 4 已完成 profile、授权审计、有界 silent 抓包、
-白名单单帧发送和 CANopen SDO 的 host/Fake CAN 验证，并完成真机节点端到端 SDO HIL。
-该验收不替代示波器级物理层诊断；阶段 4 尚余周期调度未实现。
+白名单单帧发送、CANopen SDO 和有界周期调度的 host/Fake CAN 验证，并完成真机节点
+端到端 SDO HIL。当前物理 profile 未给任何帧设置 `periodic=true`，所以真实周期发送仍
+默认关闭；待操作者明确帧、周期和次数后进行物理周期 HIL。该验收不替代示波器级物理层诊断。

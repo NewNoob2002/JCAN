@@ -54,6 +54,8 @@ Linux 端使用 `time.monotonic_ns()`/`clock_nanosleep(CLOCK_MONOTONIC, TIMER_AB
 
 最小任务模型只需：帧定义、周期、下次截止时间、启停状态。多帧时用一个调度线程和按截止时间排序的队列即可；只有测得吞吐不足后再增加工作线程。
 
+MCP 已实现 `jcan_periodic_start/list/stop`：使用一个持久 CAN 会话和单调绝对截止时间，丢期时跳过过期实例而不突发补发；任务限制为 1–1000 帧、10–60000 ms（下限仍受 profile 约束）。周期发送还要求对应 TX frame 显式设置 `periodic=true`，不会继承单帧发送授权。
+
 ## 验证状态
 
 - `python3 jcan.py self-test`：通过；覆盖 12 个配置/维护接口的 USB 封包、配置读取回复解析、时序范围检查，以及原有收发解析。
@@ -65,3 +67,5 @@ Linux 端使用 `time.monotonic_ns()`/`clock_nanosleep(CLOCK_MONOTONIC, TIMER_AB
 - 2026-09-02 MCP 阶段 3 HIL：具名配置写入回读、完整配置往返恢复和普通重启重枚举通过；测试后十项配置逐字节等于基线。
 - 2026-09-02 阶段 4 初始 host 验证：默认拒绝 TOML profile、有界 silent 抓包和精确白名单单帧发送通过；当时物理参数尚未填写。
 - 2026-09-02 阶段 4 profile 已修正为 500 kbit/s 经典 CAN 标准 TX、ID 0x7FF、DLC 4、payload 00000000；一次 MCP 物理发送请求通过，尚无独立接收/ACK 证据。
+- 2026-09-02 CANopen Node-ID 0x01 对象 0x2008:00 完成 Upload、同值 Download 和回读，真实节点端到端响应通过。
+- 2026-09-02 周期调度 host/Fake-CAN 验证通过：绝对截止时间、丢期跳过、显式停止、退出清理、USB 独占和 `periodic=true` 默认拒绝门控均覆盖；物理周期 HIL 尚未授权。

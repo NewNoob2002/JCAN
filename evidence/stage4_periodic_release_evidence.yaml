@@ -1,0 +1,16 @@
+release_evidence:
+  schema_version: 1
+  version: "stage-4-periodic-host-baseline"
+  source_revision: "89708ecbc50885ef489e590af3db9152582c135d"
+  safety_preflights: []
+  build_outputs: []
+  deployments: []
+  debug_sessions: []
+  runtime_monitors: []
+  bus_validations: []
+  tests:
+    - "evidence/stage4_periodic_host_test_result.yaml"
+  reviews:
+    - "AGENT_INTEGRATION_PLAN.md"
+    - "JCAN_API.md"
+    - "evidence/stage4_periodic_validation.md"
