@@ -489,8 +489,9 @@ def parse_sdo_download(data, index, subindex):
 
 def sdo_read(can, parser, node, index, subindex):
     can.send(0x600 + node, struct.pack("<BHB4x", 0x40, index, subindex))
+    deadline = time.monotonic() + 2.0
     while True:
-        frame = wait_frame(can, parser, 0x580 + node)
+        frame = wait_frame(can, parser, 0x580 + node, max(0, deadline - time.monotonic()))
         if not any(frame[flag] for flag in ("extended", "fd", "remote", "brs")) and len(frame["data"]) == 8 and frame["data"][1:4] == struct.pack("<HB", index, subindex):
             return parse_sdo_upload(frame["data"], index, subindex), frame["data"]
 
@@ -500,8 +501,9 @@ def sdo_write(can, parser, node, index, subindex, value):
     if len(value) not in commands:
         raise JCanError("仅支持 1..4 字节 expedited SDO download")
     can.send(0x600 + node, struct.pack("<BHB", commands[len(value)], index, subindex) + value.ljust(4, b"\0"))
+    deadline = time.monotonic() + 2.0
     while True:
-        frame = wait_frame(can, parser, 0x580 + node)
+        frame = wait_frame(can, parser, 0x580 + node, max(0, deadline - time.monotonic()))
         if not any(frame[flag] for flag in ("extended", "fd", "remote", "brs")) and len(frame["data"]) == 8 and frame["data"][1:4] == struct.pack("<HB", index, subindex):
             parse_sdo_download(frame["data"], index, subindex)
             return frame["data"]
