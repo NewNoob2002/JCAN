@@ -1,0 +1,14 @@
+safety_preflight:
+  schema_version: 1
+  timestamp_utc: "2026-09-02T07:14:22Z"
+  operation: "bus-write"
+  authorization: "User confirmed CAN 2.0B means standard frame and explicitly authorized physical transmission on 2026-09-02"
+  target:
+    board: "JooDevice JTool-CAN ffff:0004"
+    hardware_revision: "unknown"
+    probe_or_adapter_serial: "207F346D5650"
+    transport: "can"
+  artifact_or_stimulus: "commit ce7469c20f57ff99aabf712471f45125059c96ba; jcan_mcp.py sha256:8453cfa25d97b0e1d2c3b8dfef18bbb8d7f659cbc21a70688eb11ae3307716cd; profile sha256:90dd27b4e10fc85e4d5bea4684c33e4b3867c9535afb3f6769bee972440b9e4a; one classic standard data frame ID 0x7FF DLC 4 payload 00000000"
+  limits: "Operator-declared nominal bitrate 500000 bit/s; exactly one TX attempt; extended=false, fd=false, brs=false, remote=false; no periodic task, no application retry, auto_retrans profile value 0; CANStart normal immediately before send and CANStop in finally"
+  recovery_plan: "Always issue CANStop and close USB handle; do not retry on failure; verify adapter remains online and eight bus-related configuration fields still match the profile; unplug/replug serial 207F346D5650 only if USB becomes unavailable"
+  approved: true
