@@ -1,0 +1,4 @@
+interface:
+  display_name: "JCAN"
+  short_description: "Safely operate JTool-CAN adapters through the local MCP server"
+  default_prompt: "Use $jcan to inspect a JTool-CAN adapter safely and choose the least-risk operation."
