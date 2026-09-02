@@ -1,0 +1,14 @@
+safety_preflight:
+  schema_version: 1
+  timestamp_utc: "2026-09-02T05:33:17Z"
+  operation: "storage-write"
+  authorization: "User requested current-stage hardware HIL validation on 2026-09-02"
+  target:
+    board: "JooDevice JTool-CAN ffff:0004"
+    hardware_revision: "unknown"
+    probe_or_adapter_serial: "207F346D5650"
+    transport: "can"
+  artifact_or_stimulus: "commit 88cc8a6; jcan_mcp.py sha256:ab0b0f8133afb15b0b15e79838c985db96f04d413e575bc4b796bcc6d8b896c2; jcan_apply_config with current values followed by jcan_config_roundtrip_test"
+  limits: "CAN remains stopped; exact baseline can_speed=0c, can_customval=00000100040059001e00, fd_speed=06, fd_customval=0000030004001d000a00, standard/term_res/busoff_recovery/auto_retrans=00, hardware_version=10 zero bytes, id=0000; no IntoBoot; same-value apply then reversible roundtrip only"
+  recovery_plan: "Baseline is read before every operation; failures restore all ten fields and report restored status; if USB disconnects, reconnect serial 207F346D5650 and restore the exact values recorded here"
+  approved: true

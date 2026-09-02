@@ -1,0 +1,18 @@
+{
+  "ok": true,
+  "serial": "207F346D5650",
+  "operation": "loopback_benchmark",
+  "data": {
+    "count": 10,
+    "elapsed_s": 0.004688371,
+    "fps": 2132.9370051986075,
+    "latency_ms": {
+      "min": 0.414004,
+      "avg": 0.45582389999999995,
+      "p95": 0.524299,
+      "max": 0.524299
+    }
+  },
+  "warnings": [],
+  "evidence_path": "/home/gtc/Desktop/workspace/JCAN/evidence/runtime/20260902T053419.180144Z-1788327259180169171-loopback_benchmark.json"
+}

@@ -44,7 +44,9 @@ Agent 客户端通过 MCP 调用，而非直接调用 `jcan.py`：
 - 10 帧 internal silent-loopback benchmark：通过。
 - MCP session 退出清理：通过。
 
-该 HIL 记录仅覆盖阶段 1–2 的五个工具。阶段 3 因当前未枚举到适配器，尚未执行真机配置往返和重启验证。
+阶段 3 于 2026-09-02 完成真机 HIL：具名同值配置写入回读、完整配置往返恢复、
+一次普通重启以及离线后按相同序列号重新枚举均通过。详见
+`evidence/stage3_hil_validation.md`。
 
 ## 阶段 3 host / Fake USB
 

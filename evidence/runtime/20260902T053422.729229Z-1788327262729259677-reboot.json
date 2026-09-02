@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "serial": "207F346D5650",
+  "operation": "reboot",
+  "data": {
+    "reenumerated": true,
+    "bus": 1,
+    "address": 9
+  },
+  "warnings": [],
+  "evidence_path": "/home/gtc/Desktop/workspace/JCAN/evidence/runtime/20260902T053422.729229Z-1788327262729259677-reboot.json"
+}

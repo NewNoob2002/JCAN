@@ -1,0 +1,13 @@
+{
+  "ok": true,
+  "serial": "207F346D5650",
+  "operation": "apply_config",
+  "data": {
+    "changed_fields": [],
+    "before": {},
+    "after": {},
+    "restored": null
+  },
+  "warnings": [],
+  "evidence_path": "/home/gtc/Desktop/workspace/JCAN/evidence/runtime/20260902T053419.782113Z-1788327259782160746-apply_config.json"
+}

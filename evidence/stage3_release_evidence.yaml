@@ -1,0 +1,19 @@
+release_evidence:
+  schema_version: 1
+  version: "stage-3"
+  source_revision: "88cc8a6c29385df761db2dce98798f529dc05c77"
+  safety_preflights:
+    - "evidence/stage3_hil_loopback_preflight.yaml"
+    - "evidence/stage3_hil_config_preflight.yaml"
+    - "evidence/stage3_hil_reboot_preflight.yaml"
+  build_outputs: []
+  deployments: []
+  debug_sessions: []
+  runtime_monitors: []
+  bus_validations:
+    - "evidence/stage3_hil_bus_validation.yaml"
+  tests:
+    - "evidence/stage3_host_test_result.yaml"
+    - "evidence/stage3_hil_test_result.yaml"
+  reviews:
+    - "AGENT_INTEGRATION_PLAN.md"

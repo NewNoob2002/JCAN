@@ -1,0 +1,14 @@
+safety_preflight:
+  schema_version: 1
+  timestamp_utc: "2026-09-02T05:33:17Z"
+  operation: "reset"
+  authorization: "User requested current-stage hardware HIL validation on 2026-09-02"
+  target:
+    board: "JooDevice JTool-CAN ffff:0004"
+    hardware_revision: "unknown"
+    probe_or_adapter_serial: "207F346D5650"
+    transport: "can"
+  artifact_or_stimulus: "commit 88cc8a6; jcan_mcp.py sha256:ab0b0f8133afb15b0b15e79838c985db96f04d413e575bc4b796bcc6d8b896c2; one channel 0 command 3 reboot"
+  limits: "One normal reboot after configuration restoration; no stop_in_boot write or Bootloader entry; require observed offline state followed by re-enumeration with exact serial within 15 seconds"
+  recovery_plan: "Wait for USB re-enumeration; if absent, unplug/replug adapter 207F346D5650; do not issue another reboot or enter Bootloader"
+  approved: true

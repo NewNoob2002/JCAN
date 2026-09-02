@@ -1,0 +1,22 @@
+{
+  "ok": true,
+  "serial": "207F346D5650",
+  "operation": "config_roundtrip_test",
+  "data": {
+    "restored": true,
+    "config": {
+      "can_speed": "0c",
+      "can_customval": "00 00 01 00 04 00 59 00 1e 00",
+      "fd_speed": "06",
+      "fd_customval": "00 00 03 00 04 00 1d 00 0a 00",
+      "standard": "00",
+      "term_res": "00",
+      "busoff_recovery": "00",
+      "auto_retrans": "00",
+      "hardware_version": "00 00 00 00 00 00 00 00 00 00",
+      "id": "00 00"
+    }
+  },
+  "warnings": [],
+  "evidence_path": "/home/gtc/Desktop/workspace/JCAN/evidence/runtime/20260902T053420.792389Z-1788327260792445989-config_roundtrip_test.json"
+}

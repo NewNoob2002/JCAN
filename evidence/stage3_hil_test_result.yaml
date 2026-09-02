@@ -1,0 +1,19 @@
+test_result:
+  schema_version: 1
+  source_revision: "88cc8a6c29385df761db2dce98798f529dc05c77"
+  artifact_checksums:
+    jcan.py: "b933efd458c93e648d7612c5ee5c503b2c94e9c7f7cefef0aae060e160ddc22a"
+    jcan_mcp.py: "ab0b0f8133afb15b0b15e79838c985db96f04d413e575bc4b796bcc6d8b896c2"
+    test_jcan_mcp.py: "1c5a954a72e890cedfa8199471af9962714fd1862f0d70049e3ed483f204c844"
+  safety_preflight: "evidence/stage3_hil_loopback_preflight.yaml; evidence/stage3_hil_config_preflight.yaml; evidence/stage3_hil_reboot_preflight.yaml"
+  level: "hil"
+  target: "JCAN MCP stdio + JTool-CAN ffff:0004 serial 207F346D5650"
+  command: "JCAN_TEST_SERIAL=207F346D5650 JCAN_STAGE3_TEST_SERIAL=207F346D5650 JCAN_EVIDENCE_DIR=evidence/runtime .venv/bin/python -m unittest -v test_jcan_mcp.py"
+  timing: {started_at_utc: "2026-09-02T05:34:19Z", duration_ms: 4419, timeout_ms: 30000}
+  attempts: 1
+  passed: true
+  counts: {total: 6, passed: 6, failed: 0, skipped: 0}
+  classified_failures: []
+  log: "evidence/stage3_hil_validation.md"
+  coverage: "MCP schemas and errors, USB scan, ten-field config read, three-frame silent-loopback, ten-frame benchmark, same-value apply, reversible config roundtrip, reboot offline/online re-enumeration, final baseline verification"
+  requirements: ["JCAN-MCP-STDIO", "JCAN-MCP-READ", "JCAN-MCP-LOOPBACK", "JCAN-MCP-CONFIG", "JCAN-MCP-REBOOT", "JCAN-STAGE4-CLOSED"]

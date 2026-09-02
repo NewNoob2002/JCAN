@@ -1,0 +1,14 @@
+safety_preflight:
+  schema_version: 1
+  timestamp_utc: "2026-09-02T05:33:17Z"
+  operation: "bus-write"
+  authorization: "User requested current-stage hardware HIL validation on 2026-09-02"
+  target:
+    board: "JooDevice JTool-CAN ffff:0004"
+    hardware_revision: "unknown"
+    probe_or_adapter_serial: "207F346D5650"
+    transport: "can"
+  artifact_or_stimulus: "commit 88cc8a6; jcan_mcp.py sha256:ab0b0f8133afb15b0b15e79838c985db96f04d413e575bc4b796bcc6d8b896c2; three protocol frames plus ten ID 0x555 benchmark frames"
+  limits: "CAN_MODE_SILENT_LOOPBACK only; bounded 3-frame test and 10-frame benchmark; no physical CAN/CAN-FD bus drive, capture, periodic transmission, or arbitrary payload"
+  recovery_plan: "run_loopback_test and loopback_benchmark issue CANStop in finally; close MCP stdio session and unplug/replug serial 207F346D5650 if USB fails"
+  approved: true
