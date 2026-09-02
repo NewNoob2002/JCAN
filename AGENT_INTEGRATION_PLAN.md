@@ -1,7 +1,7 @@
 # JCAN Agent Skill + MCP 实施计划
 
 日期：2026-09-02  
-状态：阶段 1–4 功能闭环；Bus-Off 故障注入因缺少外部设备延期，物理周期授权保持关闭
+状态：阶段 1–5 已完成；Bus-Off 故障注入因缺少外部设备延期，物理周期授权保持关闭
 
 ## 目标与结论
 
@@ -131,7 +131,7 @@ profile 至少包含：适配器序列号、nominal/data bitrate、CAN-FD 标准
 - 未匹配 profile 的发送请求在 USB 写入前拒绝。
 - Bus-Off/错误状态故障注入因缺少主动故障设备或分析仪延期，不声明通过。
 
-### 5. 创建 JCAN Skill
+### 5. 创建 JCAN Skill（完成）
 
 位置：`.agents/skills/jcan/`。
 
@@ -158,9 +158,9 @@ Skill 只记录 Agent 真正需要的决策：
 
 验收：
 
-- `quick_validate.py` 通过。
+- `quick_validate.py` 已通过。
 - Skill 描述能命中 JTool-CAN 请求而不吸引普通 SocketCAN 任务。
-- 使用真实请求验证 Agent 会先选择只读工具，并在物理发送前停在授权边界。
+- 独立前向验证确认 Agent 先选择 `jcan_scan`/`jcan_get_config`，并在缺少物理发送参数或授权时停止。
 
 ### 6. Codex 集成与发布门槛
 

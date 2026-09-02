@@ -1,0 +1,15 @@
+release_evidence:
+  schema_version: 1
+  version: "stage-5-jcan-skill"
+  source_revision: "cdd69aec65ee1f8890219e657c49c1cfe7f2820a"
+  safety_preflights: []
+  build_outputs: []
+  deployments: []
+  debug_sessions: []
+  runtime_monitors: []
+  bus_validations: []
+  tests:
+    - "evidence/stage5_skill_test_result.yaml"
+  reviews:
+    - "AGENT_INTEGRATION_PLAN.md"
+    - "evidence/stage5_skill_validation.md"

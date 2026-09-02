@@ -1,0 +1,19 @@
+test_result:
+  schema_version: 1
+  source_revision: "cdd69aec65ee1f8890219e657c49c1cfe7f2820a"
+  artifact_checksums:
+    .agents/skills/jcan/SKILL.md: "587f3169954cc5e28aa363b934bd06b92c0ed5025b5e4415840c1ae5d0f2b89a"
+    .agents/skills/jcan/agents/openai.yaml: "5577b63b3d40aac18d48e599ba03c5835d3e4fe6795fe9bfc039978b5e0a6541"
+    .agents/skills/jcan/references/safety.md: "0509751fc0960a59665fa7fdedd2e64ec8c3524e9ea0c2b9f56297f2d038a848"
+    .agents/skills/jcan/references/tool-contract.md: "7c3525d51c7fb869895931fa97ed89636eee248b2085fa12f2ede5c7bb33635d"
+  level: "integration"
+  target: "Codex Skill metadata, instructions, and independent routing evaluation"
+  command: "python3 /home/gtc/.codex/skills/.system/skill-creator/scripts/quick_validate.py .agents/skills/jcan"
+  timing: {started_at_utc: "2026-09-02T10:32:20Z", duration_ms: 20, timeout_ms: 10000}
+  attempts: 1
+  passed: true
+  counts: {total: 5, passed: 5, failed: 0, skipped: 0}
+  classified_failures: []
+  log: "evidence/stage5_skill_validation.md"
+  coverage: "Skill structure/frontmatter, UI metadata, JTool-CAN versus SocketCAN routing, read-first sequencing, and physical-write authorization boundary"
+  requirements: ["JCAN-SKILL-VALID", "JCAN-SKILL-DISCOVERY", "JCAN-SKILL-READ-FIRST", "JCAN-SKILL-AUTHORIZATION-BOUNDARY"]
