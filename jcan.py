@@ -571,14 +571,15 @@ def self_test(verbose=True):
         print("self-test: OK")
 
 
-def config_roundtrip_test(can):
+def config_roundtrip_test(can, verbose=True):
     baseline = {name: can._config_get(name, size) for name, size in CONFIG_FIELDS}
 
     def verify(name, expected):
         actual = can._config_get(name, len(expected))
         if actual != expected:
             raise JCanError(f"配置 {name} 回读不匹配: {actual.hex(' ')} != {expected.hex(' ')}")
-        print(f"{name}: OK")
+        if verbose:
+            print(f"{name}: OK")
 
     try:
         _, prescaler, sjw, seg1, seg2 = struct.unpack("<5H", baseline["can_customval"])
@@ -617,7 +618,8 @@ def config_roundtrip_test(can):
 
     for name, size in CONFIG_FIELDS:
         verify(name, baseline[name])
-    print("config-roundtrip-test: OK（配置已恢复）")
+    if verbose:
+        print("config-roundtrip-test: OK（配置已恢复）")
 
 
 def build_parser():
