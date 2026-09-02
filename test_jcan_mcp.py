@@ -12,10 +12,100 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 import jcan_mcp
-from jcan import CONFIG_VALUE_OFFSET, HEADER, JCanError, packet
+from jcan import CONFIG_VALUE_OFFSET, HEADER, MODES, JCanError, crc8, packet
 
 
 ROOT = Path(__file__).resolve().parent
+
+
+def write_active_profile(path):
+    path.write_text(
+        """schema_version = 1
+name = \"test-bus\"
+enabled = true
+approved = true
+serial = \"TEST\"
+nominal_bitrate = 500000
+data_bitrate = 2000000
+fd_standard = 0
+min_period_ms = 10
+max_periodic_tasks = 4
+cleanup_state = \"stopped\"
+max_capture_ms = 100
+max_capture_frames = 10
+
+[expected_config]
+can_speed = \"0c\"
+can_customval = \"00 00 01 00 04 00 59 00 1e 00\"
+fd_speed = \"06\"
+fd_customval = \"00 00 03 00 04 00 1d 00 0a 00\"
+standard = \"00\"
+term_res = \"00\"
+busoff_recovery = \"00\"
+auto_retrans = \"00\"
+
+[[frames]]
+name = \"command\"
+direction = \"tx\"
+id = 0x123
+extended = false
+fd = false
+brs = false
+remote = false
+dlc = [2]
+data = [\"11 22\"]
+
+[[frames]]
+name = \"reply\"
+direction = \"rx\"
+id = 0x321
+extended = false
+fd = false
+brs = false
+remote = false
+dlc = [2]
+data = [\"33 44\"]
+""",
+        encoding="utf-8",
+    )
+
+
+class FakePhysicalCan:
+    def __init__(self, frames=()):
+        self.config = FakeUsb().original
+        self.frames = list(frames)
+        self.started = []
+        self.sent = []
+        self.stopped = False
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        pass
+
+    def _config_get(self, name, _size):
+        return self.config[name]
+
+    def enable_receive(self):
+        pass
+
+    def start(self, mode):
+        self.started.append(mode)
+
+    def stop(self):
+        self.stopped = True
+
+    def send(self, can_id, data, **flags):
+        self.sent.append((can_id, data, flags))
+
+    def receive(self, _timeout_ms):
+        return self.frames.pop(0) if self.frames else b""
+
+
+def raw_frame(can_id, data):
+    raw = b"\xff\xaa" + bytes([len(data)]) + struct.pack("<IH", can_id, 1) + data
+    return raw + bytes([crc8(raw)])
 
 
 class FakeUsb:
@@ -107,7 +197,7 @@ class FakeDevices:
     def __init__(self, error):
         self.error = error
 
-    async def run(self, _function, *_args):
+    async def run(self, _function, *_args, **_kwargs):
         raise self.error
 
 
@@ -136,6 +226,9 @@ class McpStdioTest(unittest.IsolatedAsyncioTestCase):
                             "jcan_apply_config",
                             "jcan_config_roundtrip_test",
                             "jcan_reboot",
+                            "jcan_bus_profile_status",
+                            "jcan_capture",
+                            "jcan_send_once",
                         },
                     )
                     self.assertEqual(schemas["jcan_get_config"]["required"], ["serial"])
@@ -145,6 +238,14 @@ class McpStdioTest(unittest.IsolatedAsyncioTestCase):
                     )
                     self.assertEqual(schemas["jcan_apply_config"]["required"], ["serial"])
                     self.assertEqual(set(schemas["jcan_reboot"]["properties"]), {"serial", "timeout_s"})
+                    self.assertEqual(
+                        set(schemas["jcan_send_once"]["properties"]),
+                        {"serial", "can_id", "data_hex", "fd", "remote", "brs", "extended"},
+                    )
+                    self.assertEqual(
+                        set(schemas["jcan_capture"]["properties"]),
+                        {"serial", "duration_ms", "max_frames"},
+                    )
 
                     result = await asyncio.wait_for(session.call_tool("jcan_self_test", {}), 5)
                     self.assertFalse(result.isError)
@@ -161,6 +262,14 @@ class McpStdioTest(unittest.IsolatedAsyncioTestCase):
                     self.assertFalse(result.structuredContent["ok"])
                     result = await asyncio.wait_for(session.call_tool("jcan_self_test", {}), 5)
                     self.assertTrue(result.structuredContent["ok"])
+
+                    result = await asyncio.wait_for(session.call_tool("jcan_bus_profile_status", {}), 5)
+                    self.assertTrue(result.structuredContent["ok"])
+                    self.assertFalse(result.structuredContent["data"]["enabled"])
+                    result = await asyncio.wait_for(
+                        session.call_tool("jcan_send_once", {"serial": "TEST", "can_id": 0x123, "data_hex": "11 22"}), 5
+                    )
+                    self.assertFalse(result.structuredContent["ok"])
 
 
 class McpHostTest(unittest.IsolatedAsyncioTestCase):
@@ -224,6 +333,57 @@ class McpHostTest(unittest.IsolatedAsyncioTestCase):
         result = jcan_mcp._reboot("TEST", 1, lambda: usb, lambda _seconds: None)
         self.assertTrue(result["reenumerated"])
         self.assertTrue(usb.rebooted)
+
+    def test_physical_profile_send_and_capture(self):
+        profile_path = Path(self.temp.name) / "profile.toml"
+        write_active_profile(profile_path)
+        profile = jcan_mcp.BusProfile.load(profile_path)
+        self.assertTrue(profile.enabled and profile.approved)
+
+        can = FakePhysicalCan()
+        result = jcan_mcp._send_once(
+            "TEST", 0x123, "11 22", fd=False, remote=False, brs=False, extended=False,
+            profile_path=profile_path, can_factory=lambda _serial: can,
+        )
+        self.assertEqual(result["rule"], "command")
+        self.assertEqual(can.started, [MODES["normal"]])
+        self.assertTrue(can.stopped and len(can.sent) == 1)
+
+        can = FakePhysicalCan()
+        can.config = {**can.config, "term_res": b"\1"}
+        with self.assertRaises(JCanError):
+            jcan_mcp._send_once(
+                "TEST", 0x123, "11 22", fd=False, remote=False, brs=False, extended=False,
+                profile_path=profile_path, can_factory=lambda _serial: can,
+            )
+        self.assertFalse(can.started or can.sent)
+
+        with self.assertRaises(JCanError):
+            jcan_mcp._send_once(
+                "TEST", 0x123, "11 23", fd=False, remote=False, brs=False, extended=False,
+                profile_path=profile_path, can_factory=lambda _serial: self.fail("USB must not open"),
+            )
+
+        can = FakePhysicalCan([raw_frame(0x321, bytes.fromhex("33 44"))])
+        result = jcan_mcp._capture(
+            "TEST", 100, 1, profile_path=profile_path, can_factory=lambda _serial: can,
+        )
+        self.assertEqual((result["received_frames"], result["matched_frames"]), (1, 1))
+        self.assertEqual(can.started, [MODES["silent"]])
+        self.assertTrue(can.stopped)
+
+    def test_disabled_profile_rejects_before_usb(self):
+        with self.assertRaises(JCanError):
+            jcan_mcp._send_once(
+                "207F346D5650", 0x123, "11 22", fd=False, remote=False, brs=False, extended=False,
+                profile_path=ROOT / "jcan_bus_profile.toml", can_factory=lambda _serial: self.fail("USB must not open"),
+            )
+
+        profile_path = Path(self.temp.name) / "unapproved.toml"
+        write_active_profile(profile_path)
+        profile_path.write_text(profile_path.read_text().replace("approved = true", "approved = false"))
+        with self.assertRaises(JCanError):
+            jcan_mcp.BusProfile.load(profile_path)
 
 
 @unittest.skipUnless(os.environ.get("JCAN_TEST_SERIAL"), "set JCAN_TEST_SERIAL for HIL")

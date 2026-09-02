@@ -1,0 +1,41 @@
+schema_version = 1
+name = "JCAN physical bus"
+enabled = false
+approved = false
+serial = "207F346D5650"
+
+# Fill these from the real bus specification before enabling. Values of zero
+# deliberately keep physical traffic disabled.
+nominal_bitrate = 0
+data_bitrate = 0
+fd_standard = 0
+
+min_period_ms = 10
+max_periodic_tasks = 4
+cleanup_state = "stopped"
+max_capture_ms = 5000
+max_capture_frames = 1000
+
+# Raw device values are checked before any physical bus operation. They record
+# the current adapter state but do not prove the unknown preset-to-bitrate map.
+[expected_config]
+can_speed = "0c"
+can_customval = "00 00 01 00 04 00 59 00 1e 00"
+fd_speed = "06"
+fd_customval = "00 00 03 00 04 00 1d 00 0a 00"
+standard = "00"
+term_res = "00"
+busoff_recovery = "00"
+auto_retrans = "00"
+
+# Add one table per explicitly allowed frame. TX data is an exact whitelist.
+# [[frames]]
+# name = "example-command"
+# direction = "tx"
+# id = 0x123
+# extended = false
+# fd = false
+# brs = false
+# remote = false
+# dlc = [2]
+# data = ["01 02"]

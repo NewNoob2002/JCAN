@@ -7,6 +7,7 @@ import os
 import struct
 import sys
 import time
+import tomllib
 from collections.abc import AsyncIterator, Callable
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
@@ -18,6 +19,9 @@ from typing import Any
 from mcp.server.fastmcp import Context, FastMCP
 
 from jcan import (
+    DLC_LENGTHS,
+    MODES,
+    CanStreamParser,
     CONFIG_FIELDS,
     JCan,
     JCanError,
@@ -30,7 +34,15 @@ from jcan import (
 
 
 EVIDENCE_DIR = Path(os.environ.get("JCAN_EVIDENCE_DIR", Path(__file__).parent / "evidence" / "runtime"))
+PROFILE_PATH = Path(os.environ.get("JCAN_BUS_PROFILE", Path(__file__).parent / "jcan_bus_profile.toml"))
 CONFIG_NAMES = {name for name, _ in CONFIG_FIELDS}
+PROFILE_CONFIG_FIELDS = {
+    name: size for name, size in CONFIG_FIELDS
+    if name in {
+        "can_speed", "can_customval", "fd_speed", "fd_customval", "standard",
+        "term_res", "busoff_recovery", "auto_retrans",
+    }
+}
 CONFIG_ARGUMENTS = {
     "nominal_speed",
     "data_speed",
@@ -57,15 +69,202 @@ class RecoverableOperationError(JCanError):
         self.data = data
 
 
+@dataclass(frozen=True)
+class FrameRule:
+    name: str
+    direction: str
+    can_id: int
+    extended: bool
+    fd: bool
+    brs: bool
+    remote: bool
+    dlc: frozenset[int]
+    payloads: frozenset[bytes]
+
+    def matches(self, can_id: int, data: bytes, *, extended: bool, fd: bool, brs: bool, remote: bool) -> bool:
+        return (
+            self.can_id == can_id
+            and self.extended == extended
+            and self.fd == fd
+            and self.brs == brs
+            and self.remote == remote
+            and len(data) in self.dlc
+            and (not self.payloads or data in self.payloads)
+        )
+
+
+@dataclass(frozen=True)
+class BusProfile:
+    path: Path
+    name: str
+    enabled: bool
+    approved: bool
+    serial: str
+    nominal_bitrate: int
+    data_bitrate: int
+    fd_standard: int
+    min_period_ms: int
+    max_periodic_tasks: int
+    cleanup_state: str
+    max_capture_ms: int
+    max_capture_frames: int
+    expected_config: dict[str, bytes]
+    frames: tuple[FrameRule, ...]
+
+    @classmethod
+    def load(cls, path: Path = PROFILE_PATH) -> "BusProfile":
+        try:
+            raw = tomllib.loads(path.read_text(encoding="utf-8"))
+        except FileNotFoundError as exc:
+            raise JCanError(f"物理总线 profile 不存在: {path}") from exc
+        except tomllib.TOMLDecodeError as exc:
+            raise JCanError(f"物理总线 profile TOML 无效: {exc}") from exc
+
+        allowed = {
+            "schema_version", "name", "enabled", "approved", "serial", "nominal_bitrate",
+            "data_bitrate", "fd_standard", "min_period_ms", "max_periodic_tasks",
+            "cleanup_state", "max_capture_ms", "max_capture_frames", "expected_config", "frames",
+        }
+        unknown = raw.keys() - allowed
+        if unknown:
+            raise JCanError(f"profile 包含未知字段: {', '.join(sorted(unknown))}")
+        if raw.get("schema_version") != 1:
+            raise JCanError("profile schema_version 必须是 1")
+
+        def integer(name: str, minimum: int = 0, maximum: int | None = None) -> int:
+            value = raw.get(name)
+            if not isinstance(value, int) or isinstance(value, bool) or value < minimum or (maximum is not None and value > maximum):
+                ceiling = f"..{maximum}" if maximum is not None else " 或更大"
+                raise JCanError(f"profile {name} 必须是 {minimum}{ceiling} 的整数")
+            return value
+
+        enabled = raw.get("enabled")
+        approved = raw.get("approved")
+        if not isinstance(enabled, bool) or not isinstance(approved, bool):
+            raise JCanError("profile enabled/approved 必须是布尔值")
+        name = raw.get("name")
+        serial = raw.get("serial")
+        cleanup_state = raw.get("cleanup_state")
+        if not isinstance(name, str) or not name.strip() or not isinstance(serial, str):
+            raise JCanError("profile name 必须非空，serial 必须是字符串")
+        if cleanup_state != "stopped":
+            raise JCanError("profile cleanup_state 仅允许 stopped")
+
+        expected_raw = raw.get("expected_config", {})
+        if not isinstance(expected_raw, dict) or expected_raw.keys() - PROFILE_CONFIG_FIELDS.keys():
+            raise JCanError("profile expected_config 包含未知字段")
+        expected_config = {}
+        for field, value in expected_raw.items():
+            if not isinstance(value, str):
+                raise JCanError(f"profile expected_config.{field} 必须是十六进制字符串")
+            try:
+                parsed = bytes.fromhex(value)
+            except ValueError as exc:
+                raise JCanError(f"profile expected_config.{field} 不是有效十六进制") from exc
+            if len(parsed) != PROFILE_CONFIG_FIELDS[field]:
+                raise JCanError(f"profile expected_config.{field} 长度必须是 {PROFILE_CONFIG_FIELDS[field]} 字节")
+            expected_config[field] = parsed
+
+        rules = []
+        for index, item in enumerate(raw.get("frames", [])):
+            if not isinstance(item, dict):
+                raise JCanError(f"profile frames[{index}] 必须是表")
+            frame_allowed = {"name", "direction", "id", "extended", "fd", "brs", "remote", "dlc", "data"}
+            extra = item.keys() - frame_allowed
+            if extra:
+                raise JCanError(f"profile frames[{index}] 包含未知字段: {', '.join(sorted(extra))}")
+            frame_name = item.get("name")
+            direction = item.get("direction")
+            can_id = item.get("id")
+            flags = [item.get(flag, False) for flag in ("extended", "fd", "brs", "remote")]
+            dlc = item.get("dlc")
+            if not isinstance(frame_name, str) or not frame_name or direction not in {"tx", "rx"}:
+                raise JCanError(f"profile frames[{index}] 需要非空 name 和 tx/rx direction")
+            if not isinstance(can_id, int) or isinstance(can_id, bool) or not 0 <= can_id <= (0x1FFFFFFF if flags[0] else 0x7FF):
+                raise JCanError(f"profile frames[{index}] CAN ID 超出范围")
+            if any(not isinstance(flag, bool) for flag in flags):
+                raise JCanError(f"profile frames[{index}] 帧标志必须是布尔值")
+            extended, fd, brs, remote = flags
+            if brs and not fd or remote and fd:
+                raise JCanError(f"profile frames[{index}] BRS/remote 标志组合无效")
+            if not isinstance(dlc, list) or not dlc or any(not isinstance(value, int) or isinstance(value, bool) for value in dlc):
+                raise JCanError(f"profile frames[{index}] dlc 必须是非空整数数组")
+            valid_lengths = set(DLC_LENGTHS if fd else range(9))
+            if not set(dlc) <= valid_lengths or remote and set(dlc) != {0}:
+                raise JCanError(f"profile frames[{index}] DLC 与帧类型不匹配")
+            payloads = set()
+            for value in item.get("data", []):
+                if not isinstance(value, str):
+                    raise JCanError(f"profile frames[{index}] data 必须是十六进制字符串数组")
+                try:
+                    payload = bytes.fromhex(value)
+                except ValueError as exc:
+                    raise JCanError(f"profile frames[{index}] data 不是有效十六进制") from exc
+                if len(payload) not in dlc:
+                    raise JCanError(f"profile frames[{index}] payload 长度未列入 DLC")
+                payloads.add(payload)
+            if direction == "tx" and not remote and not payloads:
+                raise JCanError(f"profile frames[{index}] TX 必须明确允许的 data")
+            if remote and payloads:
+                raise JCanError(f"profile frames[{index}] remote 帧不能包含 data")
+            rules.append(FrameRule(frame_name, direction, can_id, extended, fd, brs, remote, frozenset(dlc), frozenset(payloads)))
+
+        profile = cls(
+            path, name.strip(), enabled, approved, serial.strip(), integer("nominal_bitrate"),
+            integer("data_bitrate"), integer("fd_standard", 0, 1), integer("min_period_ms", 1),
+            integer("max_periodic_tasks", 1), cleanup_state, integer("max_capture_ms", 1),
+            integer("max_capture_frames", 1), expected_config, tuple(rules),
+        )
+        if profile.enabled:
+            if not profile.approved or not profile.serial or profile.nominal_bitrate == 0:
+                raise JCanError("启用 profile 需要 approved=true、明确 serial 和 nominal_bitrate")
+            if set(profile.expected_config) != set(PROFILE_CONFIG_FIELDS):
+                raise JCanError("启用 profile 必须提供完整 expected_config")
+            if profile.expected_config["standard"] != bytes([profile.fd_standard]):
+                raise JCanError("profile fd_standard 与 expected_config.standard 不一致")
+            if any(rule.fd for rule in profile.frames) and profile.data_bitrate == 0:
+                raise JCanError("包含 CAN FD 帧的 profile 必须明确 data_bitrate")
+            if not profile.frames:
+                raise JCanError("启用 profile 必须至少定义一条 frame 规则")
+        return profile
+
+    def require_enabled(self, serial: str) -> None:
+        if not self.enabled or not self.approved:
+            raise JCanError(f"物理总线 profile {self.name} 未启用并批准")
+        if _require_serial(serial) != self.serial:
+            raise JCanError(f"序列号 {serial} 不匹配 profile {self.serial}")
+
+    def verify_config(self, can: JCan) -> None:
+        actual = _read_config(can)
+        mismatches = [name for name, expected in self.expected_config.items() if actual[name] != expected]
+        if mismatches:
+            raise JCanError(f"设备配置不匹配 profile: {', '.join(sorted(mismatches))}")
+
+    def tx_rule(self, can_id: int, data: bytes, *, extended: bool, fd: bool, brs: bool, remote: bool) -> FrameRule:
+        for rule in self.frames:
+            if rule.direction == "tx" and rule.matches(can_id, data, extended=extended, fd=fd, brs=brs, remote=remote):
+                return rule
+        raise JCanError("发送帧未匹配 profile 白名单")
+
+    def allows_rx(self, frame: dict[str, Any]) -> bool:
+        return any(
+            rule.direction == "rx" and rule.matches(
+                frame["id"], frame["data"], extended=frame["extended"], fd=frame["fd"],
+                brs=frame["brs"], remote=frame["remote"],
+            )
+            for rule in self.frames
+        )
+
+
 class DeviceManager:
     """Serialize all libusb work onto one thread."""
 
     def __init__(self):
         self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="jcan-usb")
 
-    async def run(self, function: Callable[..., Any], *args: Any) -> Any:
+    async def run(self, function: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(self.executor, lambda: function(*args))
+        return await loop.run_in_executor(self.executor, lambda: function(*args, **kwargs))
 
     def close(self):
         self.executor.shutdown(wait=True, cancel_futures=True)
@@ -143,6 +342,135 @@ def _benchmark(serial: str, count: int) -> dict[str, Any]:
         raise JCanError("帧数范围必须是 1..10000")
     with JCan(LibUsb(), _require_serial(serial)) as can:
         return loopback_benchmark(can, count)
+
+
+def _load_profile(path: Path | None = None) -> BusProfile:
+    return BusProfile.load(path or PROFILE_PATH)
+
+
+def _profile_status(path: Path | None = None) -> dict[str, Any]:
+    profile = _load_profile(path)
+    return {
+        "path": str(profile.path.resolve()),
+        "name": profile.name,
+        "enabled": profile.enabled,
+        "approved": profile.approved,
+        "serial": profile.serial,
+        "nominal_bitrate": profile.nominal_bitrate,
+        "data_bitrate": profile.data_bitrate,
+        "fd_standard": profile.fd_standard,
+        "min_period_ms": profile.min_period_ms,
+        "max_periodic_tasks": profile.max_periodic_tasks,
+        "cleanup_state": profile.cleanup_state,
+        "max_capture_ms": profile.max_capture_ms,
+        "max_capture_frames": profile.max_capture_frames,
+        "frames": [
+            {
+                "name": rule.name,
+                "direction": rule.direction,
+                "id": rule.can_id,
+                "extended": rule.extended,
+                "fd": rule.fd,
+                "brs": rule.brs,
+                "remote": rule.remote,
+                "dlc": sorted(rule.dlc),
+                "payload_variants": len(rule.payloads),
+            }
+            for rule in profile.frames
+        ],
+    }
+
+
+def _payload(data_hex: str) -> bytes:
+    if not isinstance(data_hex, str):
+        raise JCanError("data_hex 必须是十六进制字符串")
+    try:
+        return bytes.fromhex(data_hex)
+    except ValueError as exc:
+        raise JCanError("data_hex 不是有效十六进制") from exc
+
+
+def _frame_summary(frame: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": frame["id"],
+        "data": frame["data"].hex(" ").upper(),
+        "fd": frame["fd"],
+        "remote": frame["remote"],
+        "brs": frame["brs"],
+        "extended": frame["extended"],
+        "timestamp": frame["timestamp"],
+    }
+
+
+def _send_once(
+    serial: str, can_id: int, data_hex: str, *, fd: bool, remote: bool, brs: bool, extended: bool,
+    profile_path: Path | None = None, can_factory: Callable[[str], JCan] | None = None,
+) -> dict[str, Any]:
+    profile = _load_profile(profile_path)
+    profile.require_enabled(serial)
+    data = _payload(data_hex)
+    rule = profile.tx_rule(can_id, data, extended=extended, fd=fd, brs=brs, remote=remote)
+    factory = can_factory or (lambda selected: JCan(LibUsb(), selected))
+    with factory(serial) as can:
+        profile.verify_config(can)
+        can.start(MODES["normal"])
+        try:
+            can.send(can_id, data, fd=fd, remote=remote, brs=brs, extended=extended)
+        finally:
+            can.stop()
+    return {
+        "profile": profile.name,
+        "rule": rule.name,
+        "nominal_bitrate": profile.nominal_bitrate,
+        "data_bitrate": profile.data_bitrate,
+        "frame": {"id": can_id, "data": data.hex(" ").upper(), "fd": fd, "remote": remote, "brs": brs, "extended": extended},
+    }
+
+
+def _capture(
+    serial: str, duration_ms: int, max_frames: int, *, profile_path: Path | None = None,
+    can_factory: Callable[[str], JCan] | None = None,
+) -> dict[str, Any]:
+    profile = _load_profile(profile_path)
+    profile.require_enabled(serial)
+    if not isinstance(duration_ms, int) or isinstance(duration_ms, bool) or not 1 <= duration_ms <= profile.max_capture_ms:
+        raise JCanError(f"duration_ms 范围必须是 1..{profile.max_capture_ms}")
+    if not isinstance(max_frames, int) or isinstance(max_frames, bool) or not 1 <= max_frames <= profile.max_capture_frames:
+        raise JCanError(f"max_frames 范围必须是 1..{profile.max_capture_frames}")
+    if not any(rule.direction == "rx" for rule in profile.frames):
+        raise JCanError("profile 未定义 RX frame 规则")
+
+    factory = can_factory or (lambda selected: JCan(LibUsb(), selected))
+    parser = CanStreamParser()
+    samples = []
+    received = matched = 0
+    started = time.monotonic()
+    deadline = started + duration_ms / 1000
+    with factory(serial) as can:
+        profile.verify_config(can)
+        can.enable_receive()
+        can.start(MODES["silent"])
+        try:
+            while received < max_frames and time.monotonic() < deadline:
+                remaining_ms = max(1, int((deadline - time.monotonic()) * 1000))
+                for frame in parser.feed(can.receive(min(100, remaining_ms))):
+                    received += 1
+                    if profile.allows_rx(frame):
+                        matched += 1
+                        if len(samples) < 50:
+                            samples.append(_frame_summary(frame))
+                    if received >= max_frames:
+                        break
+        finally:
+            can.stop()
+    return {
+        "profile": profile.name,
+        "duration_ms": (time.monotonic() - started) * 1000,
+        "received_frames": received,
+        "matched_frames": matched,
+        "dropped_frames": received - matched,
+        "samples": samples,
+    }
 
 
 def _config_operations(changes: dict[str, Any]) -> list[tuple[str, tuple[Any, ...]]]:
@@ -339,9 +667,11 @@ def _result(operation: str, serial: str | None, *, data: Any = None, error: Exce
     return result
 
 
-async def _hardware_call(ctx: Context, operation: str, serial: str | None, function: Callable[..., Any], *args: Any) -> dict[str, Any]:
+async def _hardware_call(
+    ctx: Context, operation: str, serial: str | None, function: Callable[..., Any], *args: Any, **kwargs: Any,
+) -> dict[str, Any]:
     try:
-        data = await ctx.request_context.lifespan_context.devices.run(function, *args)
+        data = await ctx.request_context.lifespan_context.devices.run(function, *args, **kwargs)
         return _result(operation, serial, data=data)
     except (JCanError, OSError, ValueError) as exc:
         return _result(operation, serial, data=getattr(exc, "data", None), error=exc)
@@ -382,6 +712,33 @@ async def jcan_loopback_test(serial: str, ctx: Context) -> dict[str, Any]:
 async def jcan_loopback_benchmark(serial: str, ctx: Context, count: int = 100) -> dict[str, Any]:
     """Benchmark bounded internal silent-loopback round trips; count must be 1..10000."""
     return await _hardware_call(ctx, "loopback_benchmark", serial, _benchmark, serial, count)
+
+
+@mcp.tool()
+async def jcan_bus_profile_status() -> dict[str, Any]:
+    """Read and validate the local physical-bus profile without accessing USB."""
+    try:
+        return _result("bus_profile_status", None, data=_profile_status())
+    except (JCanError, OSError, ValueError) as exc:
+        return _result("bus_profile_status", None, error=exc)
+
+
+@mcp.tool()
+async def jcan_capture(serial: str, ctx: Context, duration_ms: int = 1000, max_frames: int = 100) -> dict[str, Any]:
+    """Capture bounded listen-only traffic allowed by the active physical-bus profile."""
+    return await _hardware_call(ctx, "capture", serial, _capture, serial, duration_ms, max_frames)
+
+
+@mcp.tool()
+async def jcan_send_once(
+    serial: str, can_id: int, data_hex: str, ctx: Context, fd: bool = False, remote: bool = False,
+    brs: bool = False, extended: bool = False,
+) -> dict[str, Any]:
+    """Send one frame only when serial, flags, DLC, and exact payload match the active profile."""
+    return await _hardware_call(
+        ctx, "send_once", serial, _send_once, serial, can_id, data_hex,
+        fd=fd, remote=remote, brs=brs, extended=extended,
+    )
 
 
 @mcp.tool()
