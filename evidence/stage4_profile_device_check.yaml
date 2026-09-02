@@ -1,0 +1,17 @@
+test_result:
+  schema_version: 1
+  source_revision: "067300613ceec0ba4f2999e92e78344b90d1b509"
+  artifact_checksums:
+    jcan_bus_profile.toml: "75d89fea2e3bd78a6e9246dcb2c514a7de141284cee779d8dd81e94781888d91"
+    jcan_mcp.py: "8453cfa25d97b0e1d2c3b8dfef18bbb8d7f659cbc21a70688eb11ae3307716cd"
+  level: "hil"
+  target: "JTool-CAN ffff:0004 serial 207F346D5650 at USB 001:009"
+  command: "load profile; open serial 207F346D5650; read and compare eight bus-related configuration fields; close"
+  timing: {started_at_utc: "2026-09-02T06:33:58Z", duration_ms: 439, timeout_ms: 15000}
+  attempts: 1
+  passed: true
+  counts: {total: 1, passed: 1, failed: 0, skipped: 0}
+  classified_failures: []
+  log: "evidence/stage4_profile_activation.md"
+  coverage: "serial identity and raw can_speed/can_customval/fd_speed/fd_customval/standard/term_res/busoff_recovery/auto_retrans profile match; no CANStart or physical frame transmission"
+  requirements: ["JCAN-PROFILE-SERIAL", "JCAN-PROFILE-DEVICE-CONFIG"]

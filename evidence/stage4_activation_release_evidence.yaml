@@ -1,0 +1,16 @@
+release_evidence:
+  schema_version: 1
+  version: "stage-4-profile-active"
+  source_revision: "067300613ceec0ba4f2999e92e78344b90d1b509"
+  safety_preflights: []
+  build_outputs: []
+  deployments: []
+  debug_sessions: []
+  runtime_monitors: []
+  bus_validations: []
+  tests:
+    - "evidence/stage4_profile_activation_test_result.yaml"
+    - "evidence/stage4_profile_device_check.yaml"
+  reviews:
+    - "AGENT_INTEGRATION_PLAN.md"
+    - "evidence/stage4_profile_activation.md"

@@ -1,7 +1,7 @@
 # JCAN Agent Skill + MCP 实施计划
 
 日期：2026-09-02  
-状态：阶段 1–3 已完成；阶段 4 profile、抓包和单发已通过 host 验证，物理 HIL 与周期任务待定
+状态：阶段 1–3 已完成；阶段 4 profile 已激活并匹配真机，物理发送 HIL 与周期任务待定
 
 ## 目标与结论
 
@@ -99,7 +99,8 @@ MCP Server 退出时必须停止 CAN、取消周期任务并关闭 USB handle。
 
 已实现默认拒绝的 `jcan_bus_profile.toml`。只有 `enabled=true`、`approved=true`、
 序列号/设备原始配置匹配且帧命中白名单后，物理工具才可访问 USB。当前仓库
-profile 未填写真实 bitrate 和帧规则，因此保持禁用。
+profile 已按操作者提供的规格启用：500 kbit/s、CAN 2.0B 扩展 TX、ID `0x7FF`、
+DLC 4、精确 payload `00 00 00 00`。真机原始配置已只读匹配，但尚未发送物理帧。
 
 已实现：
 
@@ -194,5 +195,6 @@ Skill 只记录 Agent 真正需要的决策：
 5. 第一版不提供 `IntoBoot`。
 6. 所有退出路径必须停止 CAN、周期任务并关闭 USB。
 
-阶段 1–3 已满足以上条件。阶段 4 已完成默认拒绝 profile、有界 silent 抓包和
-白名单单帧发送的 host/Fake CAN 验证；真实总线参数、周期调度和物理 HIL 尚未完成。
+阶段 1–3 已满足以上条件。阶段 4 已完成 profile、授权审计、有界 silent 抓包和
+白名单单帧发送的 host/Fake CAN 验证，并完成真机只读配置匹配；物理发送 HIL 和
+周期调度尚未完成。

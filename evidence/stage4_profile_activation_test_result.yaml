@@ -1,0 +1,18 @@
+test_result:
+  schema_version: 1
+  source_revision: "067300613ceec0ba4f2999e92e78344b90d1b509"
+  artifact_checksums:
+    jcan_bus_profile.toml: "75d89fea2e3bd78a6e9246dcb2c514a7de141284cee779d8dd81e94781888d91"
+    jcan_mcp.py: "8453cfa25d97b0e1d2c3b8dfef18bbb8d7f659cbc21a70688eb11ae3307716cd"
+    test_jcan_mcp.py: "88fbfcb0c90cc90c0b6def642344923db811efcf174668abe632bbaa4e2d7b64"
+  level: "integration"
+  target: "Linux host + MCP stdio + activated physical-bus profile"
+  command: ".venv/bin/python -m unittest -v test_jcan_mcp.py"
+  timing: {started_at_utc: "2026-09-02T06:33:25Z", duration_ms: 476, timeout_ms: 30000}
+  attempts: 1
+  passed: true
+  counts: {total: 8, passed: 6, failed: 0, skipped: 2}
+  classified_failures: []
+  log: "evidence/stage4_profile_activation.md"
+  coverage: "activated profile schema and approval metadata, 500 kbit/s declaration, CAN 2.0B extended TX ID 0x7FF, DLC 4, exact zero payload, pre-USB rejection of non-whitelisted payload, MCP regression"
+  requirements: ["JCAN-PROFILE-ACTIVE", "JCAN-PROFILE-AUDIT", "JCAN-SEND-WHITELIST", "JCAN-USB-PRECHECK"]
