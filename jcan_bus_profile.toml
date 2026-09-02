@@ -2,8 +2,8 @@ schema_version = 1
 name = "JCAN physical bus"
 enabled = true
 approved = true
-authorization = "User supplied the physical CAN profile on 2026-09-02"
-approved_at_utc = "2026-09-02T06:23:30Z"
+authorization = "User confirmed standard-frame physical transmission on 2026-09-02"
+approved_at_utc = "2026-09-02T07:09:39Z"
 serial = "207F346D5650"
 
 # Physical bus declaration supplied by the operator.
@@ -33,7 +33,7 @@ auto_retrans = "00"
 name = "tx-7ff-zero4"
 direction = "tx"
 id = 0x7FF
-extended = true
+extended = false
 fd = false
 brs = false
 remote = false

@@ -271,12 +271,13 @@ class McpStdioTest(unittest.IsolatedAsyncioTestCase):
                     self.assertTrue(result.structuredContent["data"]["approved"])
                     self.assertEqual(result.structuredContent["data"]["nominal_bitrate"], 500000)
                     self.assertEqual(result.structuredContent["data"]["frames"][0]["id"], 0x7FF)
+                    self.assertFalse(result.structuredContent["data"]["frames"][0]["extended"])
                     result = await asyncio.wait_for(
                         session.call_tool(
                             "jcan_send_once",
                             {
                                 "serial": "207F346D5650", "can_id": 0x7FF,
-                                "data_hex": "00 00 00 01", "extended": True,
+                                "data_hex": "00 00 00 01", "extended": False,
                             },
                         ),
                         5,
@@ -387,7 +388,7 @@ class McpHostTest(unittest.IsolatedAsyncioTestCase):
     def test_profile_gate_rejects_before_usb(self):
         with self.assertRaises(JCanError):
             jcan_mcp._send_once(
-                "207F346D5650", 0x7FF, "00 00 00 01", fd=False, remote=False, brs=False, extended=True,
+                "207F346D5650", 0x7FF, "00 00 00 01", fd=False, remote=False, brs=False, extended=False,
                 profile_path=ROOT / "jcan_bus_profile.toml", can_factory=lambda _serial: self.fail("USB must not open"),
             )
 
@@ -463,6 +464,30 @@ class McpStage3HilTest(unittest.IsolatedAsyncioTestCase):
                 )
                 self.assertTrue(result.structuredContent["ok"])
                 self.assertTrue(result.structuredContent["data"]["reenumerated"])
+
+
+@unittest.skipUnless(os.environ.get("JCAN_STAGE4_SEND_SERIAL"), "set JCAN_STAGE4_SEND_SERIAL after physical-bus safety preflight")
+class McpStage4PhysicalHilTest(unittest.IsolatedAsyncioTestCase):
+    async def test_one_whitelisted_standard_frame(self):
+        serial = os.environ["JCAN_STAGE4_SEND_SERIAL"]
+        server = StdioServerParameters(command=sys.executable, args=[str(ROOT / "jcan_mcp.py")], cwd=ROOT)
+        async with stdio_client(server) as (read, write):
+            async with ClientSession(read, write) as session:
+                await asyncio.wait_for(session.initialize(), 5)
+                result = await asyncio.wait_for(
+                    session.call_tool(
+                        "jcan_send_once",
+                        {
+                            "serial": serial,
+                            "can_id": 0x7FF,
+                            "data_hex": "00 00 00 00",
+                            "extended": False,
+                        },
+                    ),
+                    10,
+                )
+                self.assertTrue(result.structuredContent["ok"])
+                self.assertEqual(result.structuredContent["data"]["rule"], "tx-7ff-zero4")
 
 
 if __name__ == "__main__":
