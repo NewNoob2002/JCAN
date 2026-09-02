@@ -1,12 +1,11 @@
 schema_version = 1
 name = "JCAN physical bus"
-enabled = false
-approved = false
+enabled = true
+approved = true
 serial = "207F346D5650"
 
-# Fill these from the real bus specification before enabling. Values of zero
-# deliberately keep physical traffic disabled.
-nominal_bitrate = 0
+# Physical bus declaration supplied by the operator.
+nominal_bitrate = 500000
 data_bitrate = 0
 fd_standard = 0
 
@@ -28,14 +27,13 @@ term_res = "00"
 busoff_recovery = "00"
 auto_retrans = "00"
 
-# Add one table per explicitly allowed frame. TX data is an exact whitelist.
-# [[frames]]
-# name = "example-command"
-# direction = "tx"
-# id = 0x123
-# extended = false
-# fd = false
-# brs = false
-# remote = false
-# dlc = [2]
-# data = ["01 02"]
+[[frames]]
+name = "tx-7ff-zero4"
+direction = "tx"
+id = 0x7FF
+extended = true
+fd = false
+brs = false
+remote = false
+dlc = [4]
+data = ["00 00 00 00"]

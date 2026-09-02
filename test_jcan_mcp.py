@@ -265,9 +265,19 @@ class McpStdioTest(unittest.IsolatedAsyncioTestCase):
 
                     result = await asyncio.wait_for(session.call_tool("jcan_bus_profile_status", {}), 5)
                     self.assertTrue(result.structuredContent["ok"])
-                    self.assertFalse(result.structuredContent["data"]["enabled"])
+                    self.assertTrue(result.structuredContent["data"]["enabled"])
+                    self.assertTrue(result.structuredContent["data"]["approved"])
+                    self.assertEqual(result.structuredContent["data"]["nominal_bitrate"], 500000)
+                    self.assertEqual(result.structuredContent["data"]["frames"][0]["id"], 0x7FF)
                     result = await asyncio.wait_for(
-                        session.call_tool("jcan_send_once", {"serial": "TEST", "can_id": 0x123, "data_hex": "11 22"}), 5
+                        session.call_tool(
+                            "jcan_send_once",
+                            {
+                                "serial": "207F346D5650", "can_id": 0x7FF,
+                                "data_hex": "00 00 00 01", "extended": True,
+                            },
+                        ),
+                        5,
                     )
                     self.assertFalse(result.structuredContent["ok"])
 
@@ -372,10 +382,10 @@ class McpHostTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(can.started, [MODES["silent"]])
         self.assertTrue(can.stopped)
 
-    def test_disabled_profile_rejects_before_usb(self):
+    def test_profile_gate_rejects_before_usb(self):
         with self.assertRaises(JCanError):
             jcan_mcp._send_once(
-                "207F346D5650", 0x123, "11 22", fd=False, remote=False, brs=False, extended=False,
+                "207F346D5650", 0x7FF, "00 00 00 01", fd=False, remote=False, brs=False, extended=True,
                 profile_path=ROOT / "jcan_bus_profile.toml", can_factory=lambda _serial: self.fail("USB must not open"),
             )
 
