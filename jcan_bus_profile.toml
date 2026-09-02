@@ -2,8 +2,8 @@ schema_version = 1
 name = "JCAN physical bus"
 enabled = true
 approved = true
-authorization = "User confirmed standard-frame physical transmission on 2026-09-02"
-approved_at_utc = "2026-09-02T07:09:39Z"
+authorization = "User authorized CANopen node 0x01 SDO access to RAM object 0x2008:00 U16 without EEPROM save on 2026-09-02"
+approved_at_utc = "2026-09-02T07:29:00Z"
 serial = "207F346D5650"
 
 # Physical bus declaration supplied by the operator.
@@ -39,3 +39,24 @@ brs = false
 remote = false
 dlc = [4]
 data = ["00 00 00 00"]
+
+[[frames]]
+name = "canopen-node1-sdo-upload-2008-00"
+direction = "tx"
+id = 0x601
+extended = false
+fd = false
+brs = false
+remote = false
+dlc = [8]
+data = ["40 08 20 00 00 00 00 00"]
+
+[[frames]]
+name = "canopen-node1-sdo-response-2008-00"
+direction = "rx"
+id = 0x581
+extended = false
+fd = false
+brs = false
+remote = false
+dlc = [8]

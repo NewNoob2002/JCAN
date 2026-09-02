@@ -67,6 +67,38 @@ brs = false
 remote = false
 dlc = [2]
 data = [\"33 44\"]
+
+[[frames]]
+name = \"sdo-upload\"
+direction = \"tx\"
+id = 0x601
+extended = false
+fd = false
+brs = false
+remote = false
+dlc = [8]
+data = [\"40 08 20 00 00 00 00 00\"]
+
+[[frames]]
+name = \"sdo-download-same\"
+direction = \"tx\"
+id = 0x601
+extended = false
+fd = false
+brs = false
+remote = false
+dlc = [8]
+data = [\"2B 08 20 00 F4 01 00 00\"]
+
+[[frames]]
+name = \"sdo-response\"
+direction = \"rx\"
+id = 0x581
+extended = false
+fd = false
+brs = false
+remote = false
+dlc = [8]
 """,
         encoding="utf-8",
     )
@@ -231,6 +263,8 @@ class McpStdioTest(unittest.IsolatedAsyncioTestCase):
                             "jcan_bus_profile_status",
                             "jcan_capture",
                             "jcan_send_once",
+                            "jcan_sdo_read",
+                            "jcan_sdo_u16_same_value_test",
                         },
                     )
                     self.assertEqual(schemas["jcan_get_config"]["required"], ["serial"])
@@ -247,6 +281,10 @@ class McpStdioTest(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(
                         set(schemas["jcan_capture"]["properties"]),
                         {"serial", "duration_ms", "max_frames"},
+                    )
+                    self.assertEqual(
+                        set(schemas["jcan_sdo_read"]["properties"]),
+                        {"serial", "node", "index", "subindex"},
                     )
 
                     result = await asyncio.wait_for(session.call_tool("jcan_self_test", {}), 5)
@@ -397,6 +435,35 @@ class McpHostTest(unittest.IsolatedAsyncioTestCase):
         profile_path.write_text(profile_path.read_text().replace("approved = true", "approved = false"))
         with self.assertRaises(JCanError):
             jcan_mcp.BusProfile.load(profile_path)
+
+    def test_sdo_read_and_same_value_write(self):
+        profile_path = Path(self.temp.name) / "profile.toml"
+        write_active_profile(profile_path)
+        upload = bytes.fromhex("4B 08 20 00 F4 01 00 00")
+        download = bytes.fromhex("60 08 20 00 00 00 00 00")
+
+        can = FakePhysicalCan([raw_frame(0x581, upload)])
+        result = jcan_mcp._sdo_read(
+            "TEST", 1, 0x2008, 0, profile_path=profile_path, can_factory=lambda _serial: can,
+        )
+        self.assertEqual((result["value_unsigned"], result["value_hex"]), (500, "F4 01"))
+        self.assertEqual(can.sent[0][0:2], (0x601, bytes.fromhex("40 08 20 00 00 00 00 00")))
+        self.assertTrue(can.stopped)
+
+        can = FakePhysicalCan([
+            raw_frame(0x581, upload), raw_frame(0x581, download), raw_frame(0x581, upload),
+        ])
+        result = jcan_mcp._sdo_u16_same_value_test(
+            "TEST", 1, 0x2008, 0, profile_path=profile_path, can_factory=lambda _serial: can,
+        )
+        self.assertEqual(result["value_unsigned"], 500)
+        self.assertFalse(result["write_changed_value"] or result["eeprom_save"])
+        self.assertEqual([item[1] for item in can.sent], [
+            bytes.fromhex("40 08 20 00 00 00 00 00"),
+            bytes.fromhex("2B 08 20 00 F4 01 00 00"),
+            bytes.fromhex("40 08 20 00 00 00 00 00"),
+        ])
+        self.assertTrue(can.stopped)
 
 
 @unittest.skipUnless(os.environ.get("JCAN_TEST_SERIAL"), "set JCAN_TEST_SERIAL for HIL")

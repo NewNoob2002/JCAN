@@ -478,12 +478,33 @@ def parse_sdo_upload(data, index, subindex):
     return data[4:4 + size]
 
 
+def parse_sdo_download(data, index, subindex):
+    if len(data) != 8 or data[1:4] != struct.pack("<HB", index, subindex):
+        raise JCanError("SDO 回复格式或索引不匹配")
+    if data[0] == 0x80:
+        raise JCanError(f"SDO abort 0x{int.from_bytes(data[4:8], 'little'):08X}")
+    if data[0] != 0x60:
+        raise JCanError("SDO download 回复格式错误")
+
+
 def sdo_read(can, parser, node, index, subindex):
     can.send(0x600 + node, struct.pack("<BHB4x", 0x40, index, subindex))
     while True:
         frame = wait_frame(can, parser, 0x580 + node)
-        if len(frame["data"]) == 8 and frame["data"][1:4] == struct.pack("<HB", index, subindex):
+        if not any(frame[flag] for flag in ("extended", "fd", "remote", "brs")) and len(frame["data"]) == 8 and frame["data"][1:4] == struct.pack("<HB", index, subindex):
             return parse_sdo_upload(frame["data"], index, subindex), frame["data"]
+
+
+def sdo_write(can, parser, node, index, subindex, value):
+    commands = {1: 0x2F, 2: 0x2B, 3: 0x27, 4: 0x23}
+    if len(value) not in commands:
+        raise JCanError("仅支持 1..4 字节 expedited SDO download")
+    can.send(0x600 + node, struct.pack("<BHB", commands[len(value)], index, subindex) + value.ljust(4, b"\0"))
+    while True:
+        frame = wait_frame(can, parser, 0x580 + node)
+        if not any(frame[flag] for flag in ("extended", "fd", "remote", "brs")) and len(frame["data"]) == 8 and frame["data"][1:4] == struct.pack("<HB", index, subindex):
+            parse_sdo_download(frame["data"], index, subindex)
+            return frame["data"]
 
 
 def self_test(verbose=True):
@@ -496,6 +517,12 @@ def self_test(verbose=True):
     frame = parser.feed(raw[4:])[0]
     assert frame["extended"] and frame["id"] == 0x18FF0011 and frame["data"] == b"\x11\x22\x33"
     assert parse_sdo_upload(bytes.fromhex("43 18 10 01 78 56 34 12"), 0x1018, 1) == bytes.fromhex("78 56 34 12")
+    assert parse_sdo_download(bytes.fromhex("60 08 20 00 00 00 00 00"), 0x2008, 0) is None
+    try:
+        parse_sdo_download(bytes.fromhex("80 08 20 00 00 00 02 06"), 0x2008, 0)
+        assert False, "SDO abort 应抛出异常"
+    except JCanError:
+        pass
 
     class FakeUsb:
         def __init__(self, replies):

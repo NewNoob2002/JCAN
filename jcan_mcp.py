@@ -28,6 +28,8 @@ from jcan import (
     LibUsb,
     config_roundtrip_test,
     loopback_benchmark,
+    sdo_read,
+    sdo_write,
     run_loopback_test,
     self_test,
 )
@@ -410,6 +412,98 @@ def _frame_summary(frame: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _sdo_target(node: int, index: int, subindex: int) -> None:
+    if not isinstance(node, int) or isinstance(node, bool) or not 1 <= node <= 0x7F:
+        raise JCanError("CANopen Node-ID 范围必须是 1..127")
+    if not isinstance(index, int) or isinstance(index, bool) or not 0 <= index <= 0xFFFF:
+        raise JCanError("SDO index 范围必须是 0..65535")
+    if not isinstance(subindex, int) or isinstance(subindex, bool) or not 0 <= subindex <= 0xFF:
+        raise JCanError("SDO subindex 范围必须是 0..255")
+
+
+def _sdo_rx_rule(profile: BusProfile, node: int, data: bytes) -> FrameRule:
+    frame = {
+        "id": 0x580 + node, "data": data, "fd": False, "remote": False,
+        "brs": False, "extended": False,
+    }
+    for rule in profile.frames:
+        if rule.direction == "rx" and rule.matches(
+            frame["id"], data, extended=False, fd=False, brs=False, remote=False,
+        ):
+            return rule
+    raise JCanError("SDO 响应未匹配 profile RX 白名单")
+
+
+def _sdo_read(
+    serial: str, node: int, index: int, subindex: int, *, profile_path: Path | None = None,
+    can_factory: Callable[[str], JCan] | None = None,
+) -> dict[str, Any]:
+    _sdo_target(node, index, subindex)
+    profile = _load_profile(profile_path)
+    profile.require_enabled(serial)
+    request = struct.pack("<BHB4x", 0x40, index, subindex)
+    tx_rule = profile.tx_rule(0x600 + node, request, extended=False, fd=False, brs=False, remote=False)
+    factory = can_factory or (lambda selected: JCan(LibUsb(), selected))
+    parser = CanStreamParser()
+    with factory(serial) as can:
+        profile.verify_config(can)
+        can.enable_receive()
+        can.start(MODES["normal"])
+        try:
+            value, response = sdo_read(can, parser, node, index, subindex)
+            rx_rule = _sdo_rx_rule(profile, node, response)
+        finally:
+            can.stop()
+    return {
+        "profile": profile.name, "node": node, "index": index, "subindex": subindex,
+        "value_hex": value.hex(" ").upper(), "value_unsigned": int.from_bytes(value, "little"),
+        "request": request.hex(" ").upper(), "response": response.hex(" ").upper(),
+        "tx_rule": tx_rule.name, "rx_rule": rx_rule.name,
+    }
+
+
+def _sdo_u16_same_value_test(
+    serial: str, node: int, index: int, subindex: int, *, profile_path: Path | None = None,
+    can_factory: Callable[[str], JCan] | None = None,
+) -> dict[str, Any]:
+    _sdo_target(node, index, subindex)
+    profile = _load_profile(profile_path)
+    profile.require_enabled(serial)
+    upload = struct.pack("<BHB4x", 0x40, index, subindex)
+    upload_rule = profile.tx_rule(0x600 + node, upload, extended=False, fd=False, brs=False, remote=False)
+    factory = can_factory or (lambda selected: JCan(LibUsb(), selected))
+    parser = CanStreamParser()
+    with factory(serial) as can:
+        profile.verify_config(can)
+        can.enable_receive()
+        can.start(MODES["normal"])
+        try:
+            baseline, first_upload = sdo_read(can, parser, node, index, subindex)
+            first_rx_rule = _sdo_rx_rule(profile, node, first_upload)
+            if len(baseline) != 2:
+                raise JCanError(f"SDO 对象不是 U16: 返回 {len(baseline)} 字节")
+            download = struct.pack("<BHB", 0x2B, index, subindex) + baseline + b"\0\0"
+            download_rule = profile.tx_rule(
+                0x600 + node, download, extended=False, fd=False, brs=False, remote=False,
+            )
+            download_response = sdo_write(can, parser, node, index, subindex, baseline)
+            download_rx_rule = _sdo_rx_rule(profile, node, download_response)
+            verified, second_upload = sdo_read(can, parser, node, index, subindex)
+            second_rx_rule = _sdo_rx_rule(profile, node, second_upload)
+            if verified != baseline:
+                raise JCanError("SDO 同值写入后回读不匹配")
+        finally:
+            can.stop()
+    return {
+        "profile": profile.name, "node": node, "index": index, "subindex": subindex,
+        "value_hex": baseline.hex(" ").upper(), "value_unsigned": int.from_bytes(baseline, "little"),
+        "write_changed_value": False, "eeprom_save": False,
+        "requests": [upload.hex(" ").upper(), download.hex(" ").upper(), upload.hex(" ").upper()],
+        "responses": [first_upload.hex(" ").upper(), download_response.hex(" ").upper(), second_upload.hex(" ").upper()],
+        "rules": [upload_rule.name, first_rx_rule.name, download_rule.name, download_rx_rule.name, second_rx_rule.name],
+    }
+
+
 def _send_once(
     serial: str, can_id: int, data_hex: str, *, fd: bool, remote: bool, brs: bool, extended: bool,
     profile_path: Path | None = None, can_factory: Callable[[str], JCan] | None = None,
@@ -746,6 +840,24 @@ async def jcan_send_once(
     return await _hardware_call(
         ctx, "send_once", serial, _send_once, serial, can_id, data_hex,
         fd=fd, remote=remote, brs=brs, extended=extended,
+    )
+
+
+@mcp.tool()
+async def jcan_sdo_read(
+    serial: str, node: int, index: int, subindex: int, ctx: Context,
+) -> dict[str, Any]:
+    """Read one expedited CANopen SDO object allowed by the active physical-bus profile."""
+    return await _hardware_call(ctx, "sdo_read", serial, _sdo_read, serial, node, index, subindex)
+
+
+@mcp.tool()
+async def jcan_sdo_u16_same_value_test(
+    serial: str, node: int, index: int, subindex: int, ctx: Context,
+) -> dict[str, Any]:
+    """Read a profile-approved U16 object, download the same value, and verify it by upload."""
+    return await _hardware_call(
+        ctx, "sdo_u16_same_value_test", serial, _sdo_u16_same_value_test, serial, node, index, subindex,
     )
 
 
