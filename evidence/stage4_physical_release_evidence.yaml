@@ -1,0 +1,17 @@
+release_evidence:
+  schema_version: 1
+  version: "stage-4-physical-send-request"
+  source_revision: "ce7469c20f57ff99aabf712471f45125059c96ba"
+  safety_preflights:
+    - "evidence/stage4_physical_send_preflight.yaml"
+  build_outputs: []
+  deployments: []
+  debug_sessions: []
+  runtime_monitors: []
+  bus_validations:
+    - "evidence/stage4_physical_bus_validation.yaml"
+  tests:
+    - "evidence/stage4_physical_send_test_result.yaml"
+  reviews:
+    - "AGENT_INTEGRATION_PLAN.md"
+    - "evidence/stage4_physical_send_validation.md"

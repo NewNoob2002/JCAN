@@ -64,4 +64,4 @@ Linux 端使用 `time.monotonic_ns()`/`clock_nanosleep(CLOCK_MONOTONIC, TIMER_AB
 - 未验证：`JCANIntoBoot`、物理收发器/线束/终端/真实总线位时序，以及设备端是否存在未公开的周期发送私有命令。
 - 2026-09-02 MCP 阶段 3 HIL：具名配置写入回读、完整配置往返恢复和普通重启重枚举通过；测试后十项配置逐字节等于基线。
 - 2026-09-02 阶段 4 初始 host 验证：默认拒绝 TOML profile、有界 silent 抓包和精确白名单单帧发送通过；当时物理参数尚未填写。
-- 2026-09-02 阶段 4 profile 已按 500 kbit/s、CAN 2.0B 扩展 TX、ID 0x7FF、DLC 4、payload 00000000 激活；真机配置只读匹配，尚未发送物理帧。
+- 2026-09-02 阶段 4 profile 已修正为 500 kbit/s 经典 CAN 标准 TX、ID 0x7FF、DLC 4、payload 00000000；一次 MCP 物理发送请求通过，尚无独立接收/ACK 证据。

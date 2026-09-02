@@ -1,0 +1,21 @@
+{
+  "ok": true,
+  "serial": "207F346D5650",
+  "operation": "send_once",
+  "data": {
+    "profile": "JCAN physical bus",
+    "rule": "tx-7ff-zero4",
+    "nominal_bitrate": 500000,
+    "data_bitrate": 0,
+    "frame": {
+      "id": 2047,
+      "data": "00 00 00 00",
+      "fd": false,
+      "remote": false,
+      "brs": false,
+      "extended": false
+    }
+  },
+  "warnings": [],
+  "evidence_path": "/home/gtc/Desktop/workspace/JCAN/evidence/runtime/20260902T071638.335366Z-1788333398335394069-send_once.json"
+}

@@ -1,0 +1,19 @@
+test_result:
+  schema_version: 1
+  source_revision: "ce7469c20f57ff99aabf712471f45125059c96ba"
+  artifact_checksums:
+    jcan_bus_profile.toml: "90dd27b4e10fc85e4d5bea4684c33e4b3867c9535afb3f6769bee972440b9e4a"
+    jcan_mcp.py: "8453cfa25d97b0e1d2c3b8dfef18bbb8d7f659cbc21a70688eb11ae3307716cd"
+    test_jcan_mcp.py: "299fa1323abc222c34513c6e5b11321ceaef1436fab91727a45ba578d0228232"
+  safety_preflight: "evidence/stage4_physical_send_preflight.yaml"
+  level: "hil"
+  target: "MCP stdio -> JTool-CAN ffff:0004 serial 207F346D5650 -> physical CAN bus"
+  command: "JCAN_STAGE4_SEND_SERIAL=207F346D5650 JCAN_EVIDENCE_DIR=evidence/runtime .venv/bin/python -m unittest -v test_jcan_mcp.McpStage4PhysicalHilTest"
+  timing: {started_at_utc: "2026-09-02T07:16:37Z", duration_ms: 414, timeout_ms: 30000}
+  attempts: 1
+  passed: true
+  counts: {total: 1, passed: 1, failed: 0, skipped: 0}
+  classified_failures: []
+  log: "evidence/stage4_physical_send_validation.md"
+  coverage: "active profile authorization, serial and device-config match, exact standard-frame ID/DLC/payload whitelist, one MCP physical send request, CANStop cleanup, postflight adapter/config check"
+  requirements: ["JCAN-PHYSICAL-SEND-REQUEST", "JCAN-PROFILE-WHITELIST", "JCAN-PHYSICAL-CLEANUP"]

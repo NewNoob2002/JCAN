@@ -1,0 +1,15 @@
+bus_validation:
+  schema_version: 1
+  created_at_utc: "2026-09-02T07:16:37Z"
+  safety_preflight: "evidence/stage4_physical_send_preflight.yaml"
+  interface: "can"
+  adapter_or_resource: "JTool-CAN serial 207F346D5650, USB 001:009"
+  settings:
+    can: {nominal_bitrate: 500000, data_bitrate: "not applicable", listen_only: false}
+  requirements: ["JCAN-PHYSICAL-SEND-REQUEST"]
+  stimulus: "One classic standard data frame: ID 0x7FF, DLC 4, payload 00 00 00 00; extended=false, fd=false, brs=false, remote=false"
+  measurements_or_responses: "MCP jcan_send_once returned ok=true with no warnings; independent receiver/analyzer observation was not available"
+  raw_capture: "evidence/runtime/20260902T071638.335366Z-1788333398335394069-send_once.json"
+  report: "evidence/stage4_physical_send_validation.md"
+  cleanup: {required: true, completed: true, final_state: "CANStop completed by jcan_send_once; adapter online at USB 001:009; eight bus-related config fields still match profile"}
+  passed: true
