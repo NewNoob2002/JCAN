@@ -1,0 +1,14 @@
+safety_preflight:
+  schema_version: 1
+  timestamp_utc: "2026-09-02T08:02:40Z"
+  operation: "bus-write"
+  authorization: "User authorized safe read/write access to CANopen Node-ID 0x01 RAM object 0x2008:00 U16 without EEPROM save; physical upload confirmed baseline value 200"
+  target:
+    board: "CANopen drive, Node-ID 0x01"
+    hardware_revision: "unknown"
+    probe_or_adapter_serial: "207F346D5650"
+    transport: "can"
+  artifact_or_stimulus: "source 9732cbe; profile SHA-256 9c5a7873ebd08f038d156d9319253a37710c6beafdbc5340f119ba7132583b38; exact request sequence: 0x601#4008200000000000, 0x601#2B082000C8000000, 0x601#4008200000000000; expected 0x581 upload/download/upload responses"
+  limits: "500000 bit/s standard classic CAN; Node-ID 0x01 only; index 0x2008 subindex 0x00 U16 only; download value equals verified baseline 200, so configured maximum speed remains unchanged; exactly three requests, each response wait bounded to 2 seconds; no retry, PDO, NMT, controlword, motion setpoint, periodic traffic, or EEPROM save"
+  recovery_plan: "Always issue CANStop; on any failure stop without additional download; the only permitted download writes the existing value 200, and an upload after success verifies 200; RAM value also returns to stored configuration after operator-controlled power cycle"
+  approved: true

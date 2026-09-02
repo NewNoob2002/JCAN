@@ -1,20 +1,21 @@
 test_result:
   schema_version: 1
-  source_revision: "52676fdcd78e0d813627fdcc193720b2fe33f0f1"
+  source_revision: "e565d659ba70a96b01a161e7c1fe1b17cf919d46"
   artifact_checksums:
-    jcan_mcp.py: "ee99044cbbb9c874a4ba1dfbab03ff0648dac6b90ed1e6977469e1fea4704bb3"
-    test_jcan_mcp.py: "f936a9e99f53e16f1275de16f5ace219986c274abf28e87e7fc89b35efd76c75"
-    jcan_bus_profile.toml: "e4db6a015e9c88ea6036b936e1e4d789de1edef72521fe1770159a54899628b9"
+    jcan.py: "4360180a146c956dca2116c5eaf2c0dc24105647f96e4aec1d2ca40070385e69"
+    jcan_mcp.py: "3a949a72ec83a61a3f4f0c54231a3cf6d82d9e7e2e379f5e5cdaca8c6a921c85"
+    test_jcan_mcp.py: "dd5055d502e3d23b9da720eb2927502f650254cf9d310cbe563c4a384a8b1a8b"
+    jcan_bus_profile.toml: "9c5a7873ebd08f038d156d9319253a37710c6beafdbc5340f119ba7132583b38"
     pyproject.toml: "eaf309e80f1147e7cbdb0094bb30fd7172df7b1c0dd5ef4f6852a5bdb8b48836"
     uv.lock: "a5b04f2cd5c468f04c29ecd99720e91cde2b3fca507ea64fe3440cd77ff40d7d"
   level: "integration"
   target: "Linux host + MCP stdio + Fake CAN adapter"
-  command: ".venv/bin/python -m unittest -v test_jcan_mcp.py"
-  timing: {started_at_utc: "2026-09-02T06:10:43Z", duration_ms: 468, timeout_ms: 30000}
+  command: "UV_CACHE_DIR=/tmp/jcan-uv-cache uv run python -m unittest -v"
+  timing: {started_at_utc: "2026-09-02T08:08:00Z", duration_ms: 471, timeout_ms: 30000}
   attempts: 1
   passed: true
-  counts: {total: 8, passed: 6, failed: 0, skipped: 2}
+  counts: {total: 10, passed: 7, failed: 0, skipped: 3}
   classified_failures: []
   log: "evidence/stage4_profile_validation.md"
-  coverage: "strict TOML profile parsing, explicit approval gate, serial/config matching, exact TX ID/flags/DLC/payload whitelist, pre-USB rejection, bounded silent capture, MCP schemas, stage 1-3 regression"
-  requirements: ["JCAN-PROFILE", "JCAN-PROFILE-DEFAULT-DENY", "JCAN-CAPTURE-BOUNDED", "JCAN-SEND-WHITELIST", "JCAN-USB-PRECHECK"]
+  coverage: "existing stage 1-4 regression plus SDO upload/download parsing, abort handling, standard-classic response filtering, exact profile gating, U16 same-value download and readback over Fake CAN, MCP tool schemas"
+  requirements: ["JCAN-PROFILE", "JCAN-PROFILE-DEFAULT-DENY", "JCAN-CAPTURE-BOUNDED", "JCAN-SEND-WHITELIST", "JCAN-SDO-UPLOAD", "JCAN-SDO-U16-SAME-VALUE"]

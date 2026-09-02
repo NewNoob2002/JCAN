@@ -1,0 +1,19 @@
+release_evidence:
+  schema_version: 1
+  version: "stage-4-canopen-endpoint-hil"
+  source_revision: "e565d659ba70a96b01a161e7c1fe1b17cf919d46"
+  safety_preflights:
+    - "evidence/stage4_canopen_sdo_read_preflight.yaml"
+    - "evidence/stage4_canopen_sdo_write_preflight.yaml"
+  build_outputs: []
+  deployments: []
+  debug_sessions: []
+  runtime_monitors: []
+  bus_validations:
+    - "evidence/stage4_canopen_bus_validation.yaml"
+  tests:
+    - "evidence/stage4_host_test_result.yaml"
+    - "evidence/stage4_canopen_sdo_test_result.yaml"
+  reviews:
+    - "AGENT_INTEGRATION_PLAN.md"
+    - "evidence/stage4_canopen_sdo_validation.md"

@@ -1,0 +1,15 @@
+bus_validation:
+  schema_version: 1
+  created_at_utc: "2026-09-02T08:03:40Z"
+  safety_preflight: "evidence/stage4_canopen_sdo_write_preflight.yaml"
+  interface: "can"
+  adapter_or_resource: "JTool-CAN serial 207F346D5650 -> CANopen drive Node-ID 0x01"
+  settings:
+    can: {nominal_bitrate: 500000, data_bitrate: "not applicable", listen_only: false}
+  requirements: ["JCAN-CANOPEN-SDO-ENDPOINT", "JCAN-PHYSICAL-NODE-RESPONSE"]
+  stimulus: "Exact standard-classic sequence: 0x601#4008200000000000, 0x601#2B082000C8000000, 0x601#4008200000000000; object 0x2008:00 U16; same value 200; no EEPROM save"
+  measurements_or_responses: "0x581#4B082000C8000000, 0x581#6008200000000000, 0x581#4B082000C8000000; download accepted and final readback remained 200"
+  raw_capture: "evidence/runtime/20260902T080340.182513Z-1788336220182541846-sdo_u16_same_value_test.json"
+  report: "evidence/stage4_canopen_sdo_validation.md"
+  cleanup: {required: true, completed: true, final_state: "CANStop completed; object remained 200; no EEPROM save; adapter online and bus profile config unchanged"}
+  passed: true

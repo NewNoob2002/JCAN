@@ -1,0 +1,20 @@
+test_result:
+  schema_version: 1
+  source_revision: "9732cbe1cbc6addc06ae79b901796df52b7310c7"
+  artifact_checksums:
+    jcan.py: "d379eaf7616b14992404ad7994db5ec3f47227f4643e702b3def1ff5885a75f0"
+    jcan_mcp.py: "3a949a72ec83a61a3f4f0c54231a3cf6d82d9e7e2e379f5e5cdaca8c6a921c85"
+    test_jcan_mcp.py: "dd5055d502e3d23b9da720eb2927502f650254cf9d310cbe563c4a384a8b1a8b"
+    jcan_bus_profile.toml: "9c5a7873ebd08f038d156d9319253a37710c6beafdbc5340f119ba7132583b38"
+  safety_preflight: "evidence/stage4_canopen_sdo_write_preflight.yaml"
+  level: "hil"
+  target: "JTool-CAN serial 207F346D5650 -> physical CANopen drive Node-ID 0x01"
+  command: "profile-gated _sdo_u16_same_value_test(serial=207F346D5650,node=1,index=0x2008,subindex=0) with JSON evidence recording"
+  timing: {started_at_utc: "2026-09-02T08:03:40Z", duration_ms: 17600, timeout_ms: 20000}
+  attempts: 1
+  passed: true
+  counts: {total: 1, passed: 1, failed: 0, skipped: 0}
+  classified_failures: []
+  log: "evidence/stage4_canopen_sdo_validation.md"
+  coverage: "physical SDO upload, expedited U16 download response, final upload readback, exact profile payload rules, serial/config gate, CANStop and postflight adapter configuration check"
+  requirements: ["JCAN-CANOPEN-SDO-ENDPOINT", "JCAN-SDO-U16-SAME-VALUE", "JCAN-PHYSICAL-CLEANUP"]

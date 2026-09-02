@@ -1,7 +1,7 @@
 # JCAN Agent Skill + MCP 实施计划
 
 日期：2026-09-02  
-状态：阶段 1–3 已完成；阶段 4 单帧物理发送请求已通过 HIL，独立总线观测与周期任务待定
+状态：阶段 1–3 已完成；阶段 4 CANopen 节点端到端物理 HIL 已通过，周期任务待定
 
 ## 目标与结论
 
@@ -99,15 +99,19 @@ MCP Server 退出时必须停止 CAN、取消周期任务并关闭 USB handle。
 
 已实现默认拒绝的 `jcan_bus_profile.toml`。只有 `enabled=true`、`approved=true`、
 序列号/设备原始配置匹配且帧命中白名单后，物理工具才可访问 USB。当前仓库
-profile 已按操作者提供的规格启用：500 kbit/s、CAN 2.0B 扩展 TX、ID `0x7FF`、
+profile 已按操作者提供的规格启用：500 kbit/s、经典 CAN 标准帧 TX、ID `0x7FF`、
 DLC 4、精确 payload `00 00 00 00`。真机配置匹配，且一次白名单标准帧发送请求
-已通过 MCP HIL；尚无独立接收节点/分析仪证据确认导线观测或 ACK。
+已通过 HIL。随后通过 CANopen Node-ID `0x01` 对 RAM 对象 `0x2008:00` 完成
+SDO Upload → 同值 Download → Upload 回读，驱动器返回合法 `0x581` 响应，已证明
+节点端到端接收、协议处理与双向返回；未覆盖示波器级波形、采样点或 ACK 槽观测。
 
 已实现：
 
 - `jcan_capture`：有界 `duration_ms`/`max_frames`，返回统计、样本和日志路径。
 - `jcan_send_once`：必须匹配 profile 中允许的序列号、CAN ID、帧类型和 DLC。
 - `jcan_bus_profile_status`：只读检查 profile 与安全门状态。
+- `jcan_sdo_read`：仅允许 profile 明确列出的 expedited SDO Upload。
+- `jcan_sdo_u16_same_value_test`：读取 U16 基线、仅写回同值并立即回读，不保存 EEPROM。
 
 待实现：
 
@@ -197,5 +201,5 @@ Skill 只记录 Agent 真正需要的决策：
 6. 所有退出路径必须停止 CAN、周期任务并关闭 USB。
 
 阶段 1–3 已满足以上条件。阶段 4 已完成 profile、授权审计、有界 silent 抓包、
-白名单单帧发送的 host/Fake CAN 验证，并完成一次真机物理发送请求 HIL；独立总线
-观测和周期调度尚未完成。
+白名单单帧发送和 CANopen SDO 的 host/Fake CAN 验证，并完成真机节点端到端 SDO HIL。
+该验收不替代示波器级物理层诊断；阶段 4 尚余周期调度未实现。
