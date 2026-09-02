@@ -1,0 +1,16 @@
+[project]
+name = "jcan-agent"
+version = "0.1.0"
+description = "Local MCP server for JooDevice JTool-CAN adapters"
+requires-python = ">=3.12"
+dependencies = ["mcp>=1.12.4,<2"]
+
+[project.scripts]
+jcan-mcp = "jcan_mcp:main"
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["jcan", "jcan_mcp"]

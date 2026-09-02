@@ -1,0 +1,14 @@
+safety_preflight:
+  schema_version: 1
+  timestamp_utc: "2026-09-01T10:40:58Z"
+  operation: "bus-write"
+  authorization: "User requested JCAN hardware validation and Python/Rust host pre-review on 2026-09-01"
+  target:
+    board: "JooDevice JTool-CAN ffff:0004"
+    hardware_revision: "unknown"
+    probe_or_adapter_serial: "207F346D5650"
+    transport: "can"
+  artifact_or_stimulus: "jcan.py sha256:c21dfcd98b93f873c5bd20fca59f8b35b2d0c473807b0bcc75f5d06267de556f; 100 standard CAN frames ID 0x555, 8-byte sequence/complement payload"
+  limits: "Internal CAN_MODE_SILENT_LOOPBACK only; 100 sequential request/receive transactions; 2 s timeout per frame; no physical bus drive or configuration writes"
+  recovery_plan: "CANStop in finally; on USB failure unplug/replug adapter 207F346D5650"
+  approved: true

@@ -1,0 +1,14 @@
+safety_preflight:
+  schema_version: 1
+  timestamp_utc: "2026-09-01T10:38:22Z"
+  operation: "storage-write"
+  authorization: "User requested JCAN hardware validation on 2026-09-01"
+  target:
+    board: "JooDevice JTool-CAN ffff:0004"
+    hardware_revision: "unknown"
+    probe_or_adapter_serial: "207F346D5650"
+    transport: "can"
+  artifact_or_stimulus: "jcan.py sha256:cfbc581414cd7ede86c66dabae692c52c51a781312978676f41c4b2c01f42215; config-roundtrip-test"
+  limits: "CAN remains stopped; exact baseline can_speed=0x0c, can_customval=00000100040059001e00, fd_speed=0x06, fd_customval=0000030004001d000a00, standard/term_res/busoff_recovery/auto_retrans=0, hardware_version=10 zero bytes, id=0; no reboot or Bootloader command"
+  recovery_plan: "Baseline is held in memory and every field is restored in finally, followed by exact readback; if USB disconnects, reconnect serial 207F346D5650 and restore values from this record"
+  approved: true

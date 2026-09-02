@@ -1,0 +1,17 @@
+test_result:
+  schema_version: 1
+  source_revision: "uncommitted-jcan.py-sha256:c21dfcd98b93f873c5bd20fca59f8b35b2d0c473807b0bcc75f5d06267de556f"
+  artifact_checksums:
+    jcan.py: "c21dfcd98b93f873c5bd20fca59f8b35b2d0c473807b0bcc75f5d06267de556f"
+  safety_preflight: "evidence/safety_preflight.yaml; evidence/config_safety_preflight.yaml; evidence/reboot_safety_preflight.yaml; evidence/benchmark_safety_preflight.yaml"
+  level: "hil"
+  target: "JooDevice JTool-CAN ffff:0004 serial 207F346D5650"
+  command: "scan; loopback-test; config-roundtrip-test; reboot + re-scan + loopback-test; loopback-benchmark --count 100"
+  timing: {started_at_utc: "2026-09-01T10:35:41Z", duration_ms: 366000, timeout_ms: 200000}
+  attempts: 1
+  passed: true
+  counts: {total: 5, passed: 5, failed: 0, skipped: 1}
+  classified_failures: []
+  log: "evidence/hardware_validation.md"
+  coverage: "USB enumeration, CAN/CAN-FD internal loopback, reversible config, reboot recovery, 100-frame benchmark; physical bus and IntoBoot excluded"
+  requirements: ["JCAN-ENUM", "JCAN-LOOPBACK", "JCAN-CONFIG", "JCAN-REBOOT", "JCAN-PERF"]

@@ -1,0 +1,14 @@
+safety_preflight:
+  schema_version: 1
+  timestamp_utc: "2026-09-01T10:39:12Z"
+  operation: "reset"
+  authorization: "User requested JCAN hardware validation on 2026-09-01"
+  target:
+    board: "JooDevice JTool-CAN ffff:0004"
+    hardware_revision: "unknown"
+    probe_or_adapter_serial: "207F346D5650"
+    transport: "can"
+  artifact_or_stimulus: "jcan.py sha256:cfbc581414cd7ede86c66dabae692c52c51a781312978676f41c4b2c01f42215; channel 0 command 3 reboot"
+  limits: "One normal reboot only; no stop_in_boot write; CAN is stopped; verify re-enumeration by exact serial"
+  recovery_plan: "Wait for USB re-enumeration; if absent, unplug/replug adapter 207F346D5650; do not enter Bootloader"
+  approved: true

@@ -1,0 +1,14 @@
+safety_preflight:
+  schema_version: 1
+  timestamp_utc: "2026-09-01T10:35:41Z"
+  operation: "bus-write"
+  authorization: "User requested JCAN hardware validation on 2026-09-01"
+  target:
+    board: "JooDevice JTool-CAN ffff:0004"
+    hardware_revision: "unknown"
+    probe_or_adapter_serial: "207F346D5650"
+    transport: "can"
+  artifact_or_stimulus: "jcan.py sha256:1ca9d3f7f9160cba43d38b6b348b9a0feeb8cc7b77ce403038a26cffb5cfafd3; silent-loopback IDs 0x123, 0x18FF0011, 0x321 with fixed test payloads"
+  limits: "Internal CAN_MODE_SILENT_LOOPBACK only; three frames; 2 s timeout per frame; no configuration, reboot, bootloader, device-ID, or hardware-version writes"
+  recovery_plan: "jcan.py always issues CANStop in finally; on USB failure unplug/replug adapter 207F346D5650"
+  approved: true

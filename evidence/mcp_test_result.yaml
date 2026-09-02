@@ -1,0 +1,21 @@
+test_result:
+  schema_version: 1
+  source_revision: "uncommitted-jcan-mcp-sha256:5f67d4491696ac88540cb49a596bfca772d72d36dcca66a89acfec37e1b7c590"
+  artifact_checksums:
+    jcan.py: "7b78a1c5f815ebb8d1dbf6b37653234cd035dbdf5cc326422612c2c761dcc4b2"
+    jcan_mcp.py: "5f67d4491696ac88540cb49a596bfca772d72d36dcca66a89acfec37e1b7c590"
+    test_jcan_mcp.py: "6048b91187be8ea5913ece65cf66e3279be21432defc686f071340569a5e7b92"
+    pyproject.toml: "eaf309e80f1147e7cbdb0094bb30fd7172df7b1c0dd5ef4f6852a5bdb8b48836"
+    uv.lock: "a5b04f2cd5c468f04c29ecd99720e91cde2b3fca507ea64fe3440cd77ff40d7d"
+  safety_preflight: "evidence/mcp_hil_safety_preflight.yaml"
+  level: "hil"
+  target: "JCAN MCP stdio + JTool-CAN serial 207F346D5650"
+  command: "JCAN_TEST_SERIAL=207F346D5650 .venv/bin/python -m unittest -v test_jcan_mcp.py"
+  timing: {started_at_utc: "2026-09-02T02:23:06Z", duration_ms: 827, timeout_ms: 30000}
+  attempts: 1
+  passed: true
+  counts: {total: 2, passed: 2, failed: 0, skipped: 0}
+  classified_failures: []
+  log: "evidence/mcp_validation.md"
+  coverage: "dependency lock, stdio initialize/list/call, structured error, scan, config read, silent-loopback, benchmark, lifespan cleanup"
+  requirements: ["JCAN-MCP-DEPS", "JCAN-MCP-STDIO", "JCAN-MCP-READ", "JCAN-MCP-LOOPBACK"]
