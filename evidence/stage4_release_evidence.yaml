@@ -1,0 +1,15 @@
+release_evidence:
+  schema_version: 1
+  version: "stage-4-profile-host"
+  source_revision: "52676fdcd78e0d813627fdcc193720b2fe33f0f1"
+  safety_preflights: []
+  build_outputs: []
+  deployments: []
+  debug_sessions: []
+  runtime_monitors: []
+  bus_validations: []
+  tests:
+    - "evidence/stage4_host_test_result.yaml"
+  reviews:
+    - "AGENT_INTEGRATION_PLAN.md"
+    - "evidence/stage4_profile_validation.md"

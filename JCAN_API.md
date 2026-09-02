@@ -63,3 +63,4 @@ Linux 端使用 `time.monotonic_ns()`/`clock_nanosleep(CLOCK_MONOTONIC, TIMER_AB
 - 100 帧同步内部回环：2179.0 fps；延迟 min/avg/P95/max = 0.414/0.457/0.505/0.707 ms。
 - 未验证：`JCANIntoBoot`、物理收发器/线束/终端/真实总线位时序，以及设备端是否存在未公开的周期发送私有命令。
 - 2026-09-02 MCP 阶段 3 HIL：具名配置写入回读、完整配置往返恢复和普通重启重枚举通过；测试后十项配置逐字节等于基线。
+- 2026-09-02 阶段 4 profile host 验证：默认拒绝 TOML profile、有界 silent 抓包和精确白名单单帧发送通过；真实 bitrate/帧清单未提供，因此物理操作保持禁用。

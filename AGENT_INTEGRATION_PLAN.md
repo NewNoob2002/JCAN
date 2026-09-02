@@ -1,7 +1,7 @@
 # JCAN Agent Skill + MCP 实施计划
 
 日期：2026-09-02  
-状态：阶段 1–3 已完成并通过 host + MCP stdio + HIL 验证；阶段 4 保持关闭
+状态：阶段 1–3 已完成；阶段 4 profile、抓包和单发已通过 host 验证，物理 HIL 与周期任务待定
 
 ## 目标与结论
 
@@ -95,12 +95,20 @@ MCP Server 退出时必须停止 CAN、取消周期任务并关闭 USB handle。
 - Fake USB 测试覆盖成功、拒绝、超时、短回复和恢复失败。
 - 真机配置往返后与操作前逐字节一致。
 
-### 4. 增加抓包和周期任务（关闭，等待物理总线 profile）
+### 4. 增加抓包和周期任务（部分完成）
 
-在取得物理总线 profile 后才实施：
+已实现默认拒绝的 `jcan_bus_profile.toml`。只有 `enabled=true`、`approved=true`、
+序列号/设备原始配置匹配且帧命中白名单后，物理工具才可访问 USB。当前仓库
+profile 未填写真实 bitrate 和帧规则，因此保持禁用。
+
+已实现：
 
 - `jcan_capture`：有界 `duration_ms`/`max_frames`，返回统计、样本和日志路径。
 - `jcan_send_once`：必须匹配 profile 中允许的序列号、CAN ID、帧类型和 DLC。
+- `jcan_bus_profile_status`：只读检查 profile 与安全门状态。
+
+待实现：
+
 - `jcan_periodic_start`、`jcan_periodic_list`、`jcan_periodic_stop`：服务内部调度，不由 Agent 重复调用单帧工具。
 
 profile 至少包含：适配器序列号、nominal/data bitrate、CAN-FD 标准、允许 ID/方向/DLC、最小周期、最大任务数和清理状态。
@@ -186,5 +194,5 @@ Skill 只记录 Agent 真正需要的决策：
 5. 第一版不提供 `IntoBoot`。
 6. 所有退出路径必须停止 CAN、周期任务并关闭 USB。
 
-阶段 1–3 已满足以上条件，并通过 stdio schema、Fake USB 故障注入、真机配置
-往返、普通重启和内部回环验证。阶段 4 在物理总线 profile 明确前保持关闭。
+阶段 1–3 已满足以上条件。阶段 4 已完成默认拒绝 profile、有界 silent 抓包和
+白名单单帧发送的 host/Fake CAN 验证；真实总线参数、周期调度和物理 HIL 尚未完成。

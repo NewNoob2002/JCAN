@@ -1,0 +1,20 @@
+test_result:
+  schema_version: 1
+  source_revision: "52676fdcd78e0d813627fdcc193720b2fe33f0f1"
+  artifact_checksums:
+    jcan_mcp.py: "ee99044cbbb9c874a4ba1dfbab03ff0648dac6b90ed1e6977469e1fea4704bb3"
+    test_jcan_mcp.py: "f936a9e99f53e16f1275de16f5ace219986c274abf28e87e7fc89b35efd76c75"
+    jcan_bus_profile.toml: "e4db6a015e9c88ea6036b936e1e4d789de1edef72521fe1770159a54899628b9"
+    pyproject.toml: "eaf309e80f1147e7cbdb0094bb30fd7172df7b1c0dd5ef4f6852a5bdb8b48836"
+    uv.lock: "a5b04f2cd5c468f04c29ecd99720e91cde2b3fca507ea64fe3440cd77ff40d7d"
+  level: "integration"
+  target: "Linux host + MCP stdio + Fake CAN adapter"
+  command: ".venv/bin/python -m unittest -v test_jcan_mcp.py"
+  timing: {started_at_utc: "2026-09-02T06:10:43Z", duration_ms: 468, timeout_ms: 30000}
+  attempts: 1
+  passed: true
+  counts: {total: 8, passed: 6, failed: 0, skipped: 2}
+  classified_failures: []
+  log: "evidence/stage4_profile_validation.md"
+  coverage: "strict TOML profile parsing, explicit approval gate, serial/config matching, exact TX ID/flags/DLC/payload whitelist, pre-USB rejection, bounded silent capture, MCP schemas, stage 1-3 regression"
+  requirements: ["JCAN-PROFILE", "JCAN-PROFILE-DEFAULT-DENY", "JCAN-CAPTURE-BOUNDED", "JCAN-SEND-WHITELIST", "JCAN-USB-PRECHECK"]
