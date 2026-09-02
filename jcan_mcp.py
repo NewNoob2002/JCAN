@@ -375,8 +375,8 @@ class PeriodicManager:
             raise JCanError(f"frame 规则 {rule.name} 未授权周期发送")
         if not isinstance(period_ms, int) or isinstance(period_ms, bool) or not profile.min_period_ms <= period_ms <= 60000:
             raise JCanError(f"period_ms 范围必须是 {profile.min_period_ms}..60000")
-        if not isinstance(count, int) or isinstance(count, bool) or not 1 <= count <= 1000:
-            raise JCanError("count 范围必须是 1..1000")
+        if not isinstance(count, int) or isinstance(count, bool) or not 1 <= count <= 1500:
+            raise JCanError("count 范围必须是 1..1500")
 
         while True:
             wait_for_runner = None
@@ -397,7 +397,7 @@ class PeriodicManager:
                     )
                     if self.runner and not self.runner.done():
                         entry.state = "running"
-                        entry.next_deadline = loop.time()
+                        entry.next_deadline = loop.time() + period_ms / 1000
                     self.active[task_id] = entry
                     self.wakeup.set()
                     if not self.runner or self.runner.done():
@@ -492,7 +492,7 @@ class PeriodicManager:
                     for entry in self.active.values():
                         if entry.state != "stopping":
                             entry.state = "running"
-                            entry.next_deadline = session_zero
+                            entry.next_deadline = session_zero + entry.period_ms / 1000
                     if not startup.done():
                         startup.set_result(None)
 
@@ -1163,7 +1163,7 @@ async def jcan_periodic_start(
     serial: str, can_id: int, data_hex: str, period_ms: int, count: int, ctx: Context,
     fd: bool = False, remote: bool = False, brs: bool = False, extended: bool = False,
 ) -> dict[str, Any]:
-    """Start a bounded profile-approved periodic task; count must be 1..1000."""
+    """Start a bounded profile-approved periodic task; count must be 1..1500."""
     try:
         data = await ctx.request_context.lifespan_context.periodic.start(
             serial, can_id, data_hex, period_ms, count,

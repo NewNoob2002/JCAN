@@ -2,8 +2,8 @@ schema_version = 1
 name = "JCAN physical bus"
 enabled = true
 approved = true
-authorization = "User authorized CANopen node 0x01 SDO access to RAM object 0x2008:00 U16; baseline 200 permits exact same-value download without EEPROM save"
-approved_at_utc = "2026-09-02T08:00:36Z"
+authorization = "User authorized two 50 ms periodic HIL runs on CANopen node 0x01 RAM object 0x2008:00 U16: 60 seconds and 1500 same-value downloads, without EEPROM save"
+approved_at_utc = "2026-09-02T09:15:43Z"
 serial = "207F346D5650"
 
 # Physical bus declaration supplied by the operator.
@@ -59,6 +59,7 @@ extended = false
 fd = false
 brs = false
 remote = false
+periodic = true
 dlc = [8]
 data = ["2B 08 20 00 C8 00 00 00"]
 

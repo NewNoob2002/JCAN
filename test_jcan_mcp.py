@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 import struct
 import sys
@@ -13,7 +14,7 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 import jcan_mcp
-from jcan import CONFIG_VALUE_OFFSET, HEADER, MODES, JCanError, crc8, packet
+from jcan import CanStreamParser, CONFIG_VALUE_OFFSET, HEADER, MODES, JCan, JCanError, LibUsb, crc8, packet, sdo_write
 
 
 ROOT = Path(__file__).resolve().parent
@@ -144,6 +145,33 @@ class FakePhysicalCan:
 
     def receive(self, _timeout_ms):
         return self.frames.pop(0) if self.frames else b""
+
+
+class SdoResponseCan:
+    """HIL adapter that turns each scheduled SDO frame into a checked request/response transaction."""
+
+    def __init__(self, serial):
+        self.can = JCan(LibUsb(), serial)
+        self.parser = CanStreamParser()
+        self.responses = []
+
+    def _config_get(self, name, size):
+        return self.can._config_get(name, size)
+
+    def start(self, mode):
+        self.can.enable_receive()
+        self.can.start(mode)
+
+    def send(self, can_id, data, **flags):
+        if can_id != 0x601 or data != bytes.fromhex("2B 08 20 00 C8 00 00 00") or any(flags.values()):
+            raise JCanError("周期 SDO HIL 收到未授权帧")
+        self.responses.append(sdo_write(self.can, self.parser, 1, 0x2008, 0, b"\xC8\x00"))
+
+    def stop(self):
+        self.can.stop()
+
+    def close(self):
+        self.can.close()
 
 
 def raw_frame(can_id, data):
@@ -651,6 +679,56 @@ class McpStage4PhysicalHilTest(unittest.IsolatedAsyncioTestCase):
                 )
                 self.assertTrue(result.structuredContent["ok"])
                 self.assertEqual(result.structuredContent["data"]["rule"], "tx-7ff-zero4")
+
+
+@unittest.skipUnless(os.environ.get("JCAN_STAGE4_PERIODIC_SERIAL"), "set JCAN_STAGE4_PERIODIC_SERIAL after periodic-bus safety preflight")
+class McpStage4PeriodicHilTest(unittest.IsolatedAsyncioTestCase):
+    async def _run_case(self, serial, count, name):
+        devices = jcan_mcp.DeviceManager()
+        adapters = []
+
+        def factory(selected):
+            adapter = SdoResponseCan(selected)
+            adapters.append(adapter)
+            return adapter
+
+        manager = jcan_mcp.PeriodicManager(devices, asyncio.Lock(), can_factory=factory)
+        started_at = time.monotonic()
+        try:
+            before = await devices.run(jcan_mcp._sdo_read, serial, 1, 0x2008, 0)
+            self.assertEqual(before["value_unsigned"], 200)
+            started = await manager.start(
+                serial, 0x601, "2B 08 20 00 C8 00 00 00", 50, count,
+                fd=False, remote=False, brs=False, extended=False,
+            )
+            deadline = asyncio.get_running_loop().time() + count * 0.05 + 15
+            while manager.runner is not None and asyncio.get_running_loop().time() < deadline:
+                await asyncio.sleep(0.1)
+            self.assertIsNone(manager.runner, "周期任务未在截止时间内完成")
+            listing = await manager.list(serial)
+            result = next(item for item in listing["recent"] if item["task_id"] == started["task_id"])
+            after = await devices.run(jcan_mcp._sdo_read, serial, 1, 0x2008, 0)
+            elapsed_ms = (time.monotonic() - started_at) * 1000
+            self.assertEqual((result["state"], result["sent_count"], result["missed_periods"]), ("completed", count, 0))
+            self.assertEqual(len(adapters), 1)
+            self.assertEqual(len(adapters[0].responses), count)
+            self.assertTrue(all(response == bytes.fromhex("60 08 20 00 00 00 00 00") for response in adapters[0].responses))
+            self.assertEqual(after["value_unsigned"], 200)
+            self.assertLess(result["timing"]["jitter_ms"]["max"], 50)
+            print(json.dumps({
+                "case": name, "period_ms": 50, "requested_frames": count,
+                "elapsed_ms": elapsed_ms, "sdo_responses": len(adapters[0].responses),
+                "before": before["value_unsigned"], "after": after["value_unsigned"],
+                "periodic": result,
+            }, ensure_ascii=False))
+        finally:
+            await manager.close()
+            devices.close()
+
+    async def test_50ms_for_60s_and_1500_frames(self):
+        serial = os.environ["JCAN_STAGE4_PERIODIC_SERIAL"]
+        await self._run_case(serial, 1200, "50ms-for-60s")
+        await self._run_case(serial, 1500, "50ms-for-1500-frames")
 
 
 if __name__ == "__main__":
