@@ -3,6 +3,7 @@ import os
 import struct
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -54,6 +55,7 @@ extended = false
 fd = false
 brs = false
 remote = false
+periodic = true
 dlc = [2]
 data = [\"11 22\"]
 
@@ -105,12 +107,14 @@ dlc = [8]
 
 
 class FakePhysicalCan:
-    def __init__(self, frames=()):
+    def __init__(self, frames=(), send_delay=0):
         self.config = FakeUsb().original
         self.frames = list(frames)
+        self.send_delay = send_delay
         self.started = []
         self.sent = []
         self.stopped = False
+        self.closed = False
 
     def __enter__(self):
         return self
@@ -130,7 +134,12 @@ class FakePhysicalCan:
     def stop(self):
         self.stopped = True
 
+    def close(self):
+        self.closed = True
+
     def send(self, can_id, data, **flags):
+        if self.send_delay:
+            time.sleep(self.send_delay)
         self.sent.append((can_id, data, flags))
 
     def receive(self, _timeout_ms):
@@ -263,6 +272,9 @@ class McpStdioTest(unittest.IsolatedAsyncioTestCase):
                             "jcan_bus_profile_status",
                             "jcan_capture",
                             "jcan_send_once",
+                            "jcan_periodic_start",
+                            "jcan_periodic_list",
+                            "jcan_periodic_stop",
                             "jcan_sdo_read",
                             "jcan_sdo_u16_same_value_test",
                         },
@@ -282,6 +294,15 @@ class McpStdioTest(unittest.IsolatedAsyncioTestCase):
                         set(schemas["jcan_capture"]["properties"]),
                         {"serial", "duration_ms", "max_frames"},
                     )
+                    self.assertEqual(
+                        set(schemas["jcan_periodic_start"]["properties"]),
+                        {"serial", "can_id", "data_hex", "period_ms", "count", "fd", "remote", "brs", "extended"},
+                    )
+                    self.assertEqual(
+                        schemas["jcan_periodic_start"]["required"],
+                        ["serial", "can_id", "data_hex", "period_ms", "count"],
+                    )
+                    self.assertEqual(set(schemas["jcan_periodic_stop"]["properties"]), {"serial", "task_id"})
                     self.assertEqual(
                         set(schemas["jcan_sdo_read"]["properties"]),
                         {"serial", "node", "index", "subindex"},
@@ -310,6 +331,7 @@ class McpStdioTest(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(result.structuredContent["data"]["nominal_bitrate"], 500000)
                     self.assertEqual(result.structuredContent["data"]["frames"][0]["id"], 0x7FF)
                     self.assertFalse(result.structuredContent["data"]["frames"][0]["extended"])
+                    self.assertFalse(result.structuredContent["data"]["frames"][0]["periodic"])
                     result = await asyncio.wait_for(
                         session.call_tool(
                             "jcan_send_once",
@@ -336,7 +358,10 @@ class McpHostTest(unittest.IsolatedAsyncioTestCase):
     async def test_structured_adapter_errors(self):
         for error in (JCanError("未找到设备"), OSError(13, "权限不足"), JCanError("LIBUSB_ERROR_NO_DEVICE")):
             ctx = SimpleNamespace(
-                request_context=SimpleNamespace(lifespan_context=SimpleNamespace(devices=FakeDevices(error)))
+                request_context=SimpleNamespace(lifespan_context=SimpleNamespace(
+                    devices=FakeDevices(error), hardware_gate=asyncio.Lock(),
+                    periodic=SimpleNamespace(is_active=lambda _serial: False),
+                ))
             )
             result = await jcan_mcp._hardware_call(ctx, "test", "TEST", lambda: None)
             self.assertFalse(result["ok"])
@@ -464,6 +489,77 @@ class McpHostTest(unittest.IsolatedAsyncioTestCase):
             bytes.fromhex("40 08 20 00 00 00 00 00"),
         ])
         self.assertTrue(can.stopped)
+
+    async def test_periodic_scheduler_completion_and_stop(self):
+        profile_path = Path(self.temp.name) / "profile.toml"
+        write_active_profile(profile_path)
+        devices = jcan_mcp.DeviceManager()
+        can = FakePhysicalCan(send_delay=0.025)
+        manager = jcan_mcp.PeriodicManager(
+            devices, (hardware_gate := asyncio.Lock()), profile_path=profile_path, can_factory=lambda _serial: can,
+        )
+        try:
+            started = await manager.start(
+                "TEST", 0x123, "11 22", 10, 3,
+                fd=False, remote=False, brs=False, extended=False,
+            )
+            self.assertEqual(started["state"], "running")
+            deadline = asyncio.get_running_loop().time() + 1
+            while manager.runner is not None and asyncio.get_running_loop().time() < deadline:
+                await asyncio.sleep(0.01)
+            listing = await manager.list("TEST")
+            completed = listing["recent"][-1]
+            self.assertEqual((completed["state"], completed["sent_count"]), ("completed", 3))
+            self.assertGreater(completed["missed_periods"], 0)
+            self.assertEqual(can.started, [MODES["normal"]])
+            self.assertTrue(can.stopped and can.closed)
+
+            can = FakePhysicalCan()
+            manager.can_factory = lambda _serial: can
+            started = await manager.start(
+                "TEST", 0x123, "11 22", 10, 100,
+                fd=False, remote=False, brs=False, extended=False,
+            )
+            while len(can.sent) < 2:
+                await asyncio.sleep(0.005)
+            ctx = SimpleNamespace(request_context=SimpleNamespace(lifespan_context=SimpleNamespace(
+                devices=devices, hardware_gate=hardware_gate, periodic=manager,
+            )))
+            blocked = await jcan_mcp._hardware_call(ctx, "test", "TEST", self.fail, "must not run")
+            self.assertFalse(blocked["ok"])
+            stopped = await manager.stop("TEST", started["task_id"])
+            sent = len(can.sent)
+            await asyncio.sleep(0.03)
+            self.assertEqual((stopped["state"], len(can.sent)), ("stopped", sent))
+            self.assertTrue(can.stopped and can.closed)
+
+            with self.assertRaises(JCanError):
+                await manager.start(
+                    "TEST", 0x123, "11 23", 10, 1,
+                    fd=False, remote=False, brs=False, extended=False,
+                )
+        finally:
+            await manager.close()
+            devices.close()
+
+    async def test_periodic_requires_explicit_profile_authorization(self):
+        profile_path = Path(self.temp.name) / "profile.toml"
+        write_active_profile(profile_path)
+        profile_path.write_text(profile_path.read_text().replace("periodic = true\n", ""))
+        devices = jcan_mcp.DeviceManager()
+        manager = jcan_mcp.PeriodicManager(
+            devices, asyncio.Lock(), profile_path=profile_path,
+            can_factory=lambda _serial: self.fail("USB must not open"),
+        )
+        try:
+            with self.assertRaises(JCanError):
+                await manager.start(
+                    "TEST", 0x123, "11 22", 10, 1,
+                    fd=False, remote=False, brs=False, extended=False,
+                )
+        finally:
+            await manager.close()
+            devices.close()
 
 
 @unittest.skipUnless(os.environ.get("JCAN_TEST_SERIAL"), "set JCAN_TEST_SERIAL for HIL")

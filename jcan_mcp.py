@@ -11,7 +11,7 @@ import tomllib
 from collections.abc import AsyncIterator, Callable
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -80,6 +80,7 @@ class FrameRule:
     fd: bool
     brs: bool
     remote: bool
+    periodic: bool
     dlc: frozenset[int]
     payloads: frozenset[bytes]
 
@@ -176,7 +177,7 @@ class BusProfile:
         for index, item in enumerate(raw.get("frames", [])):
             if not isinstance(item, dict):
                 raise JCanError(f"profile frames[{index}] 必须是表")
-            frame_allowed = {"name", "direction", "id", "extended", "fd", "brs", "remote", "dlc", "data"}
+            frame_allowed = {"name", "direction", "id", "extended", "fd", "brs", "remote", "periodic", "dlc", "data"}
             extra = item.keys() - frame_allowed
             if extra:
                 raise JCanError(f"profile frames[{index}] 包含未知字段: {', '.join(sorted(extra))}")
@@ -184,12 +185,13 @@ class BusProfile:
             direction = item.get("direction")
             can_id = item.get("id")
             flags = [item.get(flag, False) for flag in ("extended", "fd", "brs", "remote")]
+            periodic = item.get("periodic", False)
             dlc = item.get("dlc")
             if not isinstance(frame_name, str) or not frame_name or direction not in {"tx", "rx"}:
                 raise JCanError(f"profile frames[{index}] 需要非空 name 和 tx/rx direction")
             if not isinstance(can_id, int) or isinstance(can_id, bool) or not 0 <= can_id <= (0x1FFFFFFF if flags[0] else 0x7FF):
                 raise JCanError(f"profile frames[{index}] CAN ID 超出范围")
-            if any(not isinstance(flag, bool) for flag in flags):
+            if any(not isinstance(flag, bool) for flag in flags) or not isinstance(periodic, bool):
                 raise JCanError(f"profile frames[{index}] 帧标志必须是布尔值")
             extended, fd, brs, remote = flags
             if brs and not fd or remote and fd:
@@ -214,7 +216,7 @@ class BusProfile:
                 raise JCanError(f"profile frames[{index}] TX 必须明确允许的 data")
             if remote and payloads:
                 raise JCanError(f"profile frames[{index}] remote 帧不能包含 data")
-            rules.append(FrameRule(frame_name, direction, can_id, extended, fd, brs, remote, frozenset(dlc), frozenset(payloads)))
+            rules.append(FrameRule(frame_name, direction, can_id, extended, fd, brs, remote, periodic, frozenset(dlc), frozenset(payloads)))
 
         profile = cls(
             path, name.strip(), enabled, approved, authorization.strip(), approved_at_utc.strip(), serial.strip(),
@@ -279,16 +281,322 @@ class DeviceManager:
 
 
 @dataclass
+class PeriodicEntry:
+    task_id: str
+    serial: str
+    rule: str
+    can_id: int
+    data: bytes
+    fd: bool
+    remote: bool
+    brs: bool
+    extended: bool
+    period_ms: int
+    target_count: int
+    done: asyncio.Future[Any] = field(repr=False)
+    state: str = "starting"
+    next_deadline: float = 0.0
+    sent_count: int = 0
+    missed_periods: int = 0
+    started_at_utc: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    completed_at_utc: str | None = None
+    error: str | None = None
+    evidence_path: str | None = None
+    timings: list[dict[str, float]] = field(default_factory=list, repr=False)
+
+    def summary(self, include_timings: bool = False) -> dict[str, Any]:
+        jitters = [sample["jitter_ms"] for sample in self.timings]
+        result = {
+            "task_id": self.task_id,
+            "serial": self.serial,
+            "rule": self.rule,
+            "frame": {
+                "id": self.can_id, "data": self.data.hex(" ").upper(), "fd": self.fd,
+                "remote": self.remote, "brs": self.brs, "extended": self.extended,
+            },
+            "period_ms": self.period_ms,
+            "target_count": self.target_count,
+            "sent_count": self.sent_count,
+            "missed_periods": self.missed_periods,
+            "state": self.state,
+            "started_at_utc": self.started_at_utc,
+            "completed_at_utc": self.completed_at_utc,
+            "error": self.error,
+            "evidence_path": self.evidence_path,
+            "timing": {
+                "samples": len(jitters),
+                "jitter_ms": {
+                    "min": min(jitters) if jitters else None,
+                    "avg": sum(jitters) / len(jitters) if jitters else None,
+                    "max": max(jitters) if jitters else None,
+                },
+                "last": self.timings[-1] if self.timings else None,
+            },
+        }
+        if include_timings:
+            result["timing_samples"] = self.timings
+        return result
+
+
+class PeriodicManager:
+    """Run profile-approved periodic frames through one persistent CAN session."""
+
+    def __init__(
+        self, devices: DeviceManager, hardware_gate: asyncio.Lock, *,
+        profile_path: Path | None = None, can_factory: Callable[[str], JCan] | None = None,
+    ):
+        self.devices = devices
+        self.hardware_gate = hardware_gate
+        self.profile_path = profile_path
+        self.can_factory = can_factory or (lambda serial: JCan(LibUsb(), serial))
+        self.active: dict[str, PeriodicEntry] = {}
+        self.recent: list[dict[str, Any]] = []
+        self.lock = asyncio.Lock()
+        self.wakeup = asyncio.Event()
+        self.runner: asyncio.Task[None] | None = None
+        self.startup: asyncio.Future[None] | None = None
+        self.profile: BusProfile | None = None
+        self.closing = False
+        self.cleanup_error: str | None = None
+        self.next_id = 1
+
+    def is_active(self, serial: str) -> bool:
+        return any(entry.serial == serial for entry in self.active.values())
+
+    async def start(
+        self, serial: str, can_id: int, data_hex: str, period_ms: int, count: int, *,
+        fd: bool, remote: bool, brs: bool, extended: bool,
+    ) -> dict[str, Any]:
+        profile = _load_profile(self.profile_path)
+        profile.require_enabled(serial)
+        data = _payload(data_hex)
+        rule = profile.tx_rule(can_id, data, extended=extended, fd=fd, brs=brs, remote=remote)
+        if not rule.periodic:
+            raise JCanError(f"frame 规则 {rule.name} 未授权周期发送")
+        if not isinstance(period_ms, int) or isinstance(period_ms, bool) or not profile.min_period_ms <= period_ms <= 60000:
+            raise JCanError(f"period_ms 范围必须是 {profile.min_period_ms}..60000")
+        if not isinstance(count, int) or isinstance(count, bool) or not 1 <= count <= 1000:
+            raise JCanError("count 范围必须是 1..1000")
+
+        while True:
+            wait_for_runner = None
+            async with self.lock:
+                if self.closing and self.runner:
+                    wait_for_runner = self.runner
+                else:
+                    if len(self.active) >= profile.max_periodic_tasks:
+                        raise JCanError(f"周期任务数已达到 profile 上限 {profile.max_periodic_tasks}")
+                    if self.profile is not None and self.profile != profile:
+                        raise JCanError("运行中的周期会话与当前 profile 不一致")
+                    loop = asyncio.get_running_loop()
+                    task_id = f"periodic-{self.next_id}"
+                    self.next_id += 1
+                    entry = PeriodicEntry(
+                        task_id, serial, rule.name, can_id, data, fd, remote, brs, extended,
+                        period_ms, count, loop.create_future(),
+                    )
+                    if self.runner and not self.runner.done():
+                        entry.state = "running"
+                        entry.next_deadline = loop.time()
+                    self.active[task_id] = entry
+                    self.wakeup.set()
+                    if not self.runner or self.runner.done():
+                        self.profile = profile
+                        self.cleanup_error = None
+                        self.startup = loop.create_future()
+                        self.runner = loop.create_task(self._run(serial, profile, self.startup))
+                    startup = self.startup
+                    break
+            if wait_for_runner:
+                await wait_for_runner
+
+        if startup:
+            await startup
+        return entry.summary()
+
+    async def list(self, serial: str) -> dict[str, Any]:
+        serial = _require_serial(serial)
+        async with self.lock:
+            return {
+                "active": [entry.summary() for entry in self.active.values() if entry.serial == serial],
+                "recent": [item for item in self.recent if item["serial"] == serial],
+                "session_cleanup_error": self.cleanup_error,
+            }
+
+    async def stop(self, serial: str, task_id: str) -> dict[str, Any]:
+        serial = _require_serial(serial)
+        if not isinstance(task_id, str) or not task_id:
+            raise JCanError("task_id 必须是非空字符串")
+        async with self.lock:
+            entry = self.active.get(task_id)
+            if entry is None or entry.serial != serial:
+                raise JCanError(f"未找到周期任务 {task_id}")
+            entry.state = "stopping"
+            self.wakeup.set()
+            done = entry.done
+        summary = await done
+        if summary["state"] == "failed":
+            raise RecoverableOperationError("周期任务失败", summary)
+        async with self.lock:
+            runner = self.runner if not self.active else None
+        if runner:
+            await runner
+            if self.cleanup_error:
+                raise JCanError(f"周期任务已停止，但会话清理失败: {self.cleanup_error}")
+        return summary
+
+    async def close(self) -> None:
+        async with self.lock:
+            for entry in self.active.values():
+                entry.state = "stopping"
+            self.wakeup.set()
+            runner = self.runner
+        if runner:
+            await runner
+
+    def _open(self, serial: str, profile: BusProfile) -> JCan:
+        can = self.can_factory(serial)
+        try:
+            profile.verify_config(can)
+            can.start(MODES["normal"])
+            return can
+        except Exception:
+            can.close()
+            raise
+
+    def _finish_locked(self, entry: PeriodicEntry, state: str, error: Exception | None = None) -> dict[str, Any]:
+        self.active.pop(entry.task_id, None)
+        entry.state = state
+        entry.error = str(error) if error else None
+        entry.completed_at_utc = datetime.now(timezone.utc).isoformat()
+        full = entry.summary(include_timings=True)
+        result = _result("periodic_run", entry.serial, data=full, error=error)
+        entry.evidence_path = result["evidence_path"]
+        summary = entry.summary()
+        self.recent.append(summary)
+        self.recent[:] = self.recent[-16:]
+        if not entry.done.done():
+            entry.done.set_result(summary)
+        return summary
+
+    async def _run(self, serial: str, profile: BusProfile, startup: asyncio.Future[None]) -> None:
+        can = None
+        session_zero = 0.0
+        failure = None
+        try:
+            async with self.hardware_gate:
+                can = await self.devices.run(self._open, serial, profile)
+                loop = asyncio.get_running_loop()
+                session_zero = loop.time()
+                async with self.lock:
+                    for entry in self.active.values():
+                        if entry.state != "stopping":
+                            entry.state = "running"
+                            entry.next_deadline = session_zero
+                    if not startup.done():
+                        startup.set_result(None)
+
+                while True:
+                    self.wakeup.clear()
+                    async with self.lock:
+                        for entry in list(self.active.values()):
+                            if entry.state == "stopping":
+                                self._finish_locked(entry, "stopped")
+                        running = [entry for entry in self.active.values() if entry.state == "running"]
+                        if not running:
+                            self.closing = True
+                            break
+                        now = loop.time()
+                        due = [entry for entry in running if entry.next_deadline <= now]
+                        delay = max(0.0, min(entry.next_deadline for entry in running) - now)
+                    if not due:
+                        try:
+                            await asyncio.wait_for(self.wakeup.wait(), delay)
+                        except TimeoutError:
+                            pass
+                        continue
+
+                    for entry in sorted(due, key=lambda item: item.next_deadline):
+                        async with self.lock:
+                            if self.active.get(entry.task_id) is not entry or entry.state not in {"running", "stopping"}:
+                                continue
+                            planned = entry.next_deadline
+                        actual = loop.time()
+                        await self.devices.run(
+                            can.send, entry.can_id, entry.data, fd=entry.fd, remote=entry.remote,
+                            brs=entry.brs, extended=entry.extended,
+                        )
+                        finished = loop.time()
+                        async with self.lock:
+                            if self.active.get(entry.task_id) is not entry:
+                                continue
+                            entry.sent_count += 1
+                            entry.timings.append({
+                                "planned_ms": (planned - session_zero) * 1000,
+                                "actual_ms": (actual - session_zero) * 1000,
+                                "jitter_ms": (actual - planned) * 1000,
+                            })
+                            if entry.state == "stopping":
+                                self._finish_locked(entry, "stopped")
+                            elif entry.sent_count >= entry.target_count:
+                                self._finish_locked(entry, "completed")
+                            else:
+                                period = entry.period_ms / 1000
+                                entry.next_deadline = planned + period
+                                if entry.next_deadline <= finished:
+                                    skipped = int((finished - entry.next_deadline) // period) + 1
+                                    entry.missed_periods += skipped
+                                    entry.next_deadline += skipped * period
+        except Exception as exc:
+            failure = exc
+            async with self.lock:
+                if not startup.done():
+                    startup.set_exception(exc)
+                for entry in list(self.active.values()):
+                    self._finish_locked(entry, "failed", exc)
+        finally:
+            cleanup_errors = []
+            if can is not None:
+                try:
+                    await self.devices.run(can.stop)
+                except Exception as exc:
+                    cleanup_errors.append(f"CANStop: {exc}")
+                try:
+                    await self.devices.run(can.close)
+                except Exception as exc:
+                    cleanup_errors.append(f"USB close: {exc}")
+            self.cleanup_error = "; ".join(cleanup_errors) or None
+            _result(
+                "periodic_session", serial,
+                data={"cleanup_state": "stopped", "cleanup_errors": cleanup_errors},
+                error=JCanError(self.cleanup_error) if self.cleanup_error else None,
+            )
+            async with self.lock:
+                if not startup.done():
+                    startup.set_exception(failure or JCanError("周期会话未启动"))
+                self.runner = None
+                self.startup = None
+                self.profile = None
+                self.closing = False
+                self.wakeup.set()
+
+
+@dataclass
 class AppContext:
     devices: DeviceManager
+    hardware_gate: asyncio.Lock
+    periodic: PeriodicManager
 
 
 @asynccontextmanager
 async def lifespan(_server: FastMCP) -> AsyncIterator[AppContext]:
     devices = DeviceManager()
+    hardware_gate = asyncio.Lock()
+    periodic = PeriodicManager(devices, hardware_gate)
     try:
-        yield AppContext(devices)
+        yield AppContext(devices, hardware_gate, periodic)
     finally:
+        await periodic.close()
         devices.close()
 
 
@@ -383,6 +691,7 @@ def _profile_status(path: Path | None = None) -> dict[str, Any]:
                 "fd": rule.fd,
                 "brs": rule.brs,
                 "remote": rule.remote,
+                "periodic": rule.periodic,
                 "dlc": sorted(rule.dlc),
                 "payload_variants": len(rule.payloads),
             }
@@ -773,7 +1082,13 @@ async def _hardware_call(
     ctx: Context, operation: str, serial: str | None, function: Callable[..., Any], *args: Any, **kwargs: Any,
 ) -> dict[str, Any]:
     try:
-        data = await ctx.request_context.lifespan_context.devices.run(function, *args, **kwargs)
+        app = ctx.request_context.lifespan_context
+        if serial and app.periodic.is_active(serial):
+            raise JCanError(f"适配器 {serial} 正在执行周期任务")
+        async with app.hardware_gate:
+            if serial and app.periodic.is_active(serial):
+                raise JCanError(f"适配器 {serial} 正在执行周期任务")
+            data = await app.devices.run(function, *args, **kwargs)
         return _result(operation, serial, data=data)
     except (JCanError, OSError, ValueError) as exc:
         return _result(operation, serial, data=getattr(exc, "data", None), error=exc)
@@ -841,6 +1156,42 @@ async def jcan_send_once(
         ctx, "send_once", serial, _send_once, serial, can_id, data_hex,
         fd=fd, remote=remote, brs=brs, extended=extended,
     )
+
+
+@mcp.tool()
+async def jcan_periodic_start(
+    serial: str, can_id: int, data_hex: str, period_ms: int, count: int, ctx: Context,
+    fd: bool = False, remote: bool = False, brs: bool = False, extended: bool = False,
+) -> dict[str, Any]:
+    """Start a bounded profile-approved periodic task; count must be 1..1000."""
+    try:
+        data = await ctx.request_context.lifespan_context.periodic.start(
+            serial, can_id, data_hex, period_ms, count,
+            fd=fd, remote=remote, brs=brs, extended=extended,
+        )
+        return _result("periodic_start", serial, data=data)
+    except (JCanError, OSError, ValueError) as exc:
+        return _result("periodic_start", serial, error=exc)
+
+
+@mcp.tool()
+async def jcan_periodic_list(serial: str, ctx: Context) -> dict[str, Any]:
+    """List active and recent bounded periodic tasks for one adapter serial."""
+    try:
+        data = await ctx.request_context.lifespan_context.periodic.list(serial)
+        return _result("periodic_list", serial, data=data)
+    except (JCanError, OSError, ValueError) as exc:
+        return _result("periodic_list", serial, error=exc)
+
+
+@mcp.tool()
+async def jcan_periodic_stop(serial: str, task_id: str, ctx: Context) -> dict[str, Any]:
+    """Stop one periodic task and wait until an in-flight send and cleanup are complete."""
+    try:
+        data = await ctx.request_context.lifespan_context.periodic.stop(serial, task_id)
+        return _result("periodic_stop", serial, data=data)
+    except (JCanError, OSError, ValueError) as exc:
+        return _result("periodic_stop", serial, error=exc)
 
 
 @mcp.tool()
