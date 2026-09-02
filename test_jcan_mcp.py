@@ -24,6 +24,8 @@ def write_active_profile(path):
 name = \"test-bus\"
 enabled = true
 approved = true
+authorization = \"unit test\"
+approved_at_utc = \"2026-09-02T00:00:00Z\"
 serial = \"TEST\"
 nominal_bitrate = 500000
 data_bitrate = 2000000

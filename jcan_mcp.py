@@ -99,6 +99,8 @@ class BusProfile:
     name: str
     enabled: bool
     approved: bool
+    authorization: str
+    approved_at_utc: str
     serial: str
     nominal_bitrate: int
     data_bitrate: int
@@ -121,7 +123,8 @@ class BusProfile:
             raise JCanError(f"物理总线 profile TOML 无效: {exc}") from exc
 
         allowed = {
-            "schema_version", "name", "enabled", "approved", "serial", "nominal_bitrate",
+            "schema_version", "name", "enabled", "approved", "authorization", "approved_at_utc",
+            "serial", "nominal_bitrate",
             "data_bitrate", "fd_standard", "min_period_ms", "max_periodic_tasks",
             "cleanup_state", "max_capture_ms", "max_capture_frames", "expected_config", "frames",
         }
@@ -143,10 +146,12 @@ class BusProfile:
         if not isinstance(enabled, bool) or not isinstance(approved, bool):
             raise JCanError("profile enabled/approved 必须是布尔值")
         name = raw.get("name")
+        authorization = raw.get("authorization", "")
+        approved_at_utc = raw.get("approved_at_utc", "")
         serial = raw.get("serial")
         cleanup_state = raw.get("cleanup_state")
-        if not isinstance(name, str) or not name.strip() or not isinstance(serial, str):
-            raise JCanError("profile name 必须非空，serial 必须是字符串")
+        if not all(isinstance(value, str) for value in (name, authorization, approved_at_utc, serial)) or not name.strip():
+            raise JCanError("profile name 必须非空，授权信息和 serial 必须是字符串")
         if cleanup_state != "stopped":
             raise JCanError("profile cleanup_state 仅允许 stopped")
 
@@ -210,14 +215,15 @@ class BusProfile:
             rules.append(FrameRule(frame_name, direction, can_id, extended, fd, brs, remote, frozenset(dlc), frozenset(payloads)))
 
         profile = cls(
-            path, name.strip(), enabled, approved, serial.strip(), integer("nominal_bitrate"),
+            path, name.strip(), enabled, approved, authorization.strip(), approved_at_utc.strip(), serial.strip(),
+            integer("nominal_bitrate"),
             integer("data_bitrate"), integer("fd_standard", 0, 1), integer("min_period_ms", 1),
             integer("max_periodic_tasks", 1), cleanup_state, integer("max_capture_ms", 1),
             integer("max_capture_frames", 1), expected_config, tuple(rules),
         )
         if profile.enabled:
-            if not profile.approved or not profile.serial or profile.nominal_bitrate == 0:
-                raise JCanError("启用 profile 需要 approved=true、明确 serial 和 nominal_bitrate")
+            if not profile.approved or not profile.authorization or not profile.approved_at_utc or not profile.serial or profile.nominal_bitrate == 0:
+                raise JCanError("启用 profile 需要批准、授权来源/时间、明确 serial 和 nominal_bitrate")
             if set(profile.expected_config) != set(PROFILE_CONFIG_FIELDS):
                 raise JCanError("启用 profile 必须提供完整 expected_config")
             if profile.expected_config["standard"] != bytes([profile.fd_standard]):
@@ -355,6 +361,8 @@ def _profile_status(path: Path | None = None) -> dict[str, Any]:
         "name": profile.name,
         "enabled": profile.enabled,
         "approved": profile.approved,
+        "authorization": profile.authorization,
+        "approved_at_utc": profile.approved_at_utc,
         "serial": profile.serial,
         "nominal_bitrate": profile.nominal_bitrate,
         "data_bitrate": profile.data_bitrate,
