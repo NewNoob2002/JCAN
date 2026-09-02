@@ -54,7 +54,7 @@ Linux 端使用 `time.monotonic_ns()`/`clock_nanosleep(CLOCK_MONOTONIC, TIMER_AB
 
 最小任务模型只需：帧定义、周期、下次截止时间、启停状态。多帧时用一个调度线程和按截止时间排序的队列即可；只有测得吞吐不足后再增加工作线程。
 
-MCP 已实现 `jcan_periodic_start/list/stop`：使用一个持久 CAN 会话和单调绝对截止时间，丢期时跳过过期实例而不突发补发；任务限制为 1–1000 帧、10–60000 ms（下限仍受 profile 约束）。周期发送还要求对应 TX frame 显式设置 `periodic=true`，不会继承单帧发送授权。
+MCP 已实现 `jcan_periodic_start/list/stop`：使用一个持久 CAN 会话和单调绝对截止时间，丢期时跳过过期实例而不突发补发；任务限制为 1–1500 帧、10–60000 ms（下限仍受 profile 约束）。周期发送还要求对应 TX frame 显式设置 `periodic=true`，不会继承单帧发送授权。
 
 ## 验证状态
 
@@ -69,3 +69,4 @@ MCP 已实现 `jcan_periodic_start/list/stop`：使用一个持久 CAN 会话和
 - 2026-09-02 阶段 4 profile 已修正为 500 kbit/s 经典 CAN 标准 TX、ID 0x7FF、DLC 4、payload 00000000；一次 MCP 物理发送请求通过，尚无独立接收/ACK 证据。
 - 2026-09-02 CANopen Node-ID 0x01 对象 0x2008:00 完成 Upload、同值 Download 和回读，真实节点端到端响应通过。
 - 2026-09-02 周期调度 host/Fake-CAN 验证通过：绝对截止时间、丢期跳过、显式停止、退出清理、USB 独占和 `periodic=true` 默认拒绝门控均覆盖；物理周期 HIL 尚未授权。
+- 2026-09-02 物理周期 HIL：Node 0x01 对象 0x2008:00 同值 Download，50 ms/1200 帧和 50 ms/1500 帧共 2700 次均收到 SDO 成功响应，零丢期；最大调度抖动分别为 2.909 ms、2.881 ms，测试后 profile 恢复 `periodic=false`。

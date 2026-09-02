@@ -1,0 +1,20 @@
+test_result:
+  schema_version: 1
+  source_revision: "d75378d95715cd1da31f22abe97c7731e1147b33"
+  artifact_checksums:
+    jcan.py: "4360180a146c956dca2116c5eaf2c0dc24105647f96e4aec1d2ca40070385e69"
+    jcan_mcp.py: "52c038baeff7e74d81f7478fa00922c99d123c0df71646716f995ccc8b437d26"
+    test_jcan_mcp.py: "ef2bb7a1c3c8ac7bbf4bf9397b82cc8d3f16bbba828f3ec42d72a53702871ca5"
+    jcan_bus_profile.toml: "f3150796078733c1e397d49f3bbd7aca3fa671b8d2c82e7e33a9e351ec28f8de"
+  safety_preflight: "evidence/stage4_periodic_50ms_1500_preflight.yaml"
+  level: "hil"
+  target: "JTool-CAN serial 207F346D5650 -> physical CANopen drive Node-ID 0x01"
+  command: "JCAN_STAGE4_PERIODIC_SERIAL=207F346D5650 JCAN_EVIDENCE_DIR=evidence/runtime uv run python -m unittest -v test_jcan_mcp.McpStage4PeriodicHilTest"
+  timing: {started_at_utc: "2026-09-02T09:25:38Z", duration_ms: 75145, timeout_ms: 90000}
+  attempts: 1
+  passed: true
+  counts: {total: 1500, passed: 1500, failed: 0, skipped: 0}
+  classified_failures: []
+  log: "evidence/stage4_periodic_physical_validation.md"
+  coverage: "50 ms absolute scheduling for 1500 frames, 1500 exact SDO download responses, zero missed periods, jitter statistics, baseline/final U16 readback, CANStop/USB cleanup"
+  requirements: ["JCAN-PERIODIC-50MS-1500", "JCAN-PERIODIC-NODE-RESPONSE", "JCAN-PERIODIC-CLEANUP"]

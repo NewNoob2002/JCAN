@@ -1,16 +1,23 @@
 release_evidence:
   schema_version: 1
-  version: "stage-4-periodic-host-baseline"
-  source_revision: "89708ecbc50885ef489e590af3db9152582c135d"
-  safety_preflights: []
+  version: "stage-4-periodic-physical-hil"
+  source_revision: "f46a0165066bef44ab4f5ffff72eb80978c62f14"
+  safety_preflights:
+    - "evidence/stage4_periodic_50ms_60s_preflight.yaml"
+    - "evidence/stage4_periodic_50ms_1500_preflight.yaml"
   build_outputs: []
   deployments: []
   debug_sessions: []
   runtime_monitors: []
-  bus_validations: []
+  bus_validations:
+    - "evidence/stage4_periodic_50ms_60s_bus_validation.yaml"
+    - "evidence/stage4_periodic_50ms_1500_bus_validation.yaml"
   tests:
     - "evidence/stage4_periodic_host_test_result.yaml"
+    - "evidence/stage4_periodic_50ms_60s_test_result.yaml"
+    - "evidence/stage4_periodic_50ms_1500_test_result.yaml"
   reviews:
     - "AGENT_INTEGRATION_PLAN.md"
     - "JCAN_API.md"
     - "evidence/stage4_periodic_validation.md"
+    - "evidence/stage4_periodic_physical_validation.md"

@@ -1,17 +1,17 @@
 test_result:
   schema_version: 1
-  source_revision: "89708ecbc50885ef489e590af3db9152582c135d"
+  source_revision: "f46a0165066bef44ab4f5ffff72eb80978c62f14"
   artifact_checksums:
-    jcan_mcp.py: "2b0c2bf078690b121f74732a50c539000dd3df6795db71bf2512b9c599b3d01e"
-    test_jcan_mcp.py: "5b95520c870528378320b913e0d3deed4e374a2c809372b531f4590846c4074d"
-    jcan_bus_profile.toml: "9c5a7873ebd08f038d156d9319253a37710c6beafdbc5340f119ba7132583b38"
+    jcan_mcp.py: "52c038baeff7e74d81f7478fa00922c99d123c0df71646716f995ccc8b437d26"
+    test_jcan_mcp.py: "ef2bb7a1c3c8ac7bbf4bf9397b82cc8d3f16bbba828f3ec42d72a53702871ca5"
+    jcan_bus_profile.toml: "25dd865cfe573c58d4fca8aea69792d418c23a8518ad697ba06eb08f5edf1b3f"
   level: "integration"
   target: "Linux host + MCP stdio + Fake CAN adapter"
   command: "UV_CACHE_DIR=/tmp/jcan-uv-cache uv run python -m unittest -v"
-  timing: {started_at_utc: "2026-09-02T09:00:00Z", duration_ms: 592, timeout_ms: 30000}
+  timing: {started_at_utc: "2026-09-02T09:30:00Z", duration_ms: 600, timeout_ms: 30000}
   attempts: 1
   passed: true
-  counts: {total: 12, passed: 9, failed: 0, skipped: 3}
+  counts: {total: 13, passed: 9, failed: 0, skipped: 4}
   classified_failures: []
   log: "evidence/stage4_periodic_validation.md"
   coverage: "MCP schemas, persistent periodic CAN session, absolute monotonic deadlines, missed-period skip, bounded count/period, explicit stop, CANStop/USB cleanup, adapter mutual exclusion, periodic profile default deny, stage 1-4 regression"

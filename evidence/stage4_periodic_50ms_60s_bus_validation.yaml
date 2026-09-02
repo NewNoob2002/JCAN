@@ -1,0 +1,15 @@
+bus_validation:
+  schema_version: 1
+  created_at_utc: "2026-09-02T09:25:38Z"
+  safety_preflight: "evidence/stage4_periodic_50ms_60s_preflight.yaml"
+  interface: "can"
+  adapter_or_resource: "JTool-CAN serial 207F346D5650 -> CANopen drive Node-ID 0x01"
+  settings:
+    can: {nominal_bitrate: 500000, data_bitrate: "not applicable", listen_only: false}
+  requirements: ["JCAN-PERIODIC-50MS-60S", "JCAN-PERIODIC-NODE-RESPONSE"]
+  stimulus: "1200 standard-classic SDO downloads at 50 ms absolute period: 0x601#2B082000C8000000; object 0x2008:00 U16 same value 200; no EEPROM save"
+  measurements_or_responses: "1200/1200 exact 0x581#6008200000000000 responses; scheduler window 60.019 s; missed_periods=0; jitter min/avg/max 0.189/1.024/2.909 ms; baseline/final value 200"
+  raw_capture: "evidence/runtime/20260902T092538.648085Z-1788341138648116434-periodic_run.json; evidence/runtime/20260902T092538.655430Z-1788341138655446303-periodic_session.json"
+  report: "evidence/stage4_periodic_physical_validation.md"
+  cleanup: {required: true, completed: true, final_state: "CANStop and USB close completed; object remained 200; no EEPROM save"}
+  passed: true
