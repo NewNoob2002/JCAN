@@ -1,0 +1,14 @@
+safety_preflight:
+  schema_version: 1
+  timestamp_utc: "2026-09-02T09:22:02Z"
+  operation: "bus-write"
+  authorization: "User requested a 50 ms periodic CANopen test for 1500 frames using Node-ID 0x01 object 0x2008:00 U16 on 2026-09-02"
+  target:
+    board: "CANopen drive, Node-ID 0x01"
+    hardware_revision: "unknown"
+    probe_or_adapter_serial: "207F346D5650"
+    transport: "can"
+  artifact_or_stimulus: "source d75378d95715cd1da31f22abe97c7731e1147b33; profile SHA-256 f3150796078733c1e397d49f3bbd7aca3fa671b8d2c82e7e33a9e351ec28f8de; baseline/final upload 0x601#4008200000000000; 1500 scheduled same-value downloads 0x601#2B082000C8000000; each requires 0x581#6008200000000000"
+  limits: "500000 bit/s standard classic CAN; 50 ms absolute period; first frame at 50 ms; exactly 1500 download requests over nominal 75 seconds; Node-ID 0x01, index 0x2008, subindex 0x00, U16 value 200 only; every request must receive one matching SDO response; zero retries and zero permitted missed periods; no NMT, PDO, controlword, motion setpoint, EEPROM save, or other frame"
+  recovery_plan: "Abort on first SDO error/timeout or scheduler failure; always CANStop and close USB; final SDO upload must remain 200; the only download value equals the baseline and no EEPROM save is issued"
+  approved: true

@@ -59,7 +59,8 @@ extended = false
 fd = false
 brs = false
 remote = false
-periodic = true
+# The two operator-authorized periodic HIL runs completed; default closed again.
+periodic = false
 dlc = [8]
 data = ["2B 08 20 00 C8 00 00 00"]
 
