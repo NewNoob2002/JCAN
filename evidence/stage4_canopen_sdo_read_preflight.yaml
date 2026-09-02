@@ -1,0 +1,14 @@
+safety_preflight:
+  schema_version: 1
+  timestamp_utc: "2026-09-02T07:58:09Z"
+  operation: "bus-write"
+  authorization: "User supplied CANopen Node-ID 0x01 and authorized safe read/write access to RAM object 0x2008:00 U16 without EEPROM save on 2026-09-02"
+  target:
+    board: "CANopen drive, Node-ID 0x01"
+    hardware_revision: "unknown"
+    probe_or_adapter_serial: "207F346D5650"
+    transport: "can"
+  artifact_or_stimulus: "source 986ee3d; JCAN profile SHA-256 746004592026ae7c891ce03c29e0045e2e3df310995ad21a20851b1c48c92988; one standard classic CAN SDO upload request 0x601 DLC8 payload 40 08 20 00 00 00 00 00; expected response 0x581 DLC8 for index 0x2008 subindex 0x00"
+  limits: "500000 bit/s; one SDO upload request only; Node-ID 0x01; index 0x2008; subindex 0x00; no PDO, NMT, controlword, motion setpoint, SDO download, EEPROM save, retry, or periodic traffic; 2 second bounded response wait"
+  recovery_plan: "Always issue CANStop; upload is read-only at the CANopen object level; preserve raw request/response evidence; do not proceed to download unless the returned value is exactly two bytes and an exact same-value download frame is added to the approved profile"
+  approved: true
