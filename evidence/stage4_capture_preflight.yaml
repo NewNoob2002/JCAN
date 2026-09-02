@@ -1,0 +1,14 @@
+safety_preflight:
+  schema_version: 1
+  timestamp_utc: "2026-09-02T10:06:42Z"
+  operation: "passive-capture"
+  authorization: "User approved execution of the stage-4 closure plan, including one bounded silent physical capture, on 2026-09-02"
+  target:
+    board: "JooDevice JTool-CAN ffff:0004 connected to CANopen drive node 0x01"
+    hardware_revision: "unknown"
+    probe_or_adapter_serial: "207F346D5650"
+    transport: "can"
+  artifact_or_stimulus: "commit e0cde13b790a49801a8a33e5498f6e1497889a52; jcan_mcp.py sha256:52c038baeff7e74d81f7478fa00922c99d123c0df71646716f995ccc8b437d26; test_jcan_mcp.py sha256:bb6827c8a5c716a6fb6ca48be9432079e2efe7f15c0cd545ab668bb028149956; profile sha256:25dd865cfe573c58d4fca8aea69792d418c23a8518ad697ba06eb08f5edf1b3f"
+  limits: "500000 bit/s classic CAN; CAN_MODE_SILENT only; duration_ms=5000; max_frames=1000; no CAN transmission, configuration write, SDO request, periodic task, reset, EEPROM save, Bus-Off injection, retry, or actuator command"
+  recovery_plan: "jcan_capture always issues CANStop and closes the USB handle; verify adapter remains online and the eight profile-controlled configuration fields remain unchanged; leave every physical frame periodic=false"
+  approved: true

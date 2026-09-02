@@ -147,6 +147,28 @@ class FakePhysicalCan:
         return self.frames.pop(0) if self.frames else b""
 
 
+class LoggedFakeCan(FakePhysicalCan):
+    def _record(self, event):
+        with Path(os.environ["JCAN_FAKE_CAN_LOG"]).open("a", encoding="utf-8") as log:
+            print(event, file=log, flush=True)
+
+    def start(self, mode):
+        super().start(mode)
+        self._record("start")
+
+    def send(self, can_id, data, **flags):
+        super().send(can_id, data, **flags)
+        self._record("send")
+
+    def stop(self):
+        super().stop()
+        self._record("stop")
+
+    def close(self):
+        super().close()
+        self._record("close")
+
+
 class SdoResponseCan:
     """HIL adapter that turns each scheduled SDO frame into a checked request/response transaction."""
 
@@ -372,6 +394,45 @@ class McpStdioTest(unittest.IsolatedAsyncioTestCase):
                     )
                     self.assertFalse(result.structuredContent["ok"])
 
+    async def test_disconnect_stops_active_periodic_session(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile_path = Path(directory) / "profile.toml"
+            log_path = Path(directory) / "can.log"
+            write_active_profile(profile_path)
+            server = StdioServerParameters(
+                command=sys.executable,
+                args=[str(ROOT / "test_jcan_mcp.py"), "--fake-periodic-server"],
+                cwd=ROOT,
+                env={
+                    **os.environ,
+                    "JCAN_BUS_PROFILE": str(profile_path),
+                    "JCAN_EVIDENCE_DIR": directory,
+                    "JCAN_FAKE_CAN_LOG": str(log_path),
+                },
+            )
+            async with stdio_client(server) as (read, write):
+                async with ClientSession(read, write) as session:
+                    await asyncio.wait_for(session.initialize(), 5)
+                    result = await asyncio.wait_for(
+                        session.call_tool(
+                            "jcan_periodic_start",
+                            {
+                                "serial": "TEST", "can_id": 0x123, "data_hex": "11 22",
+                                "period_ms": 10, "count": 1500,
+                            },
+                        ),
+                        5,
+                    )
+                    self.assertTrue(result.structuredContent["ok"])
+                    deadline = asyncio.get_running_loop().time() + 1
+                    while (not log_path.exists() or "send" not in log_path.read_text()) and asyncio.get_running_loop().time() < deadline:
+                        await asyncio.sleep(0.01)
+                    self.assertIn("send", log_path.read_text())
+
+            events = log_path.read_text().splitlines()
+            self.assertEqual(events.count("start"), 1)
+            self.assertEqual(events[-2:], ["stop", "close"])
+
 
 class McpHostTest(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
@@ -589,6 +650,44 @@ class McpHostTest(unittest.IsolatedAsyncioTestCase):
             await manager.close()
             devices.close()
 
+    async def test_periodic_task_limit_and_close_cleanup(self):
+        profile_path = Path(self.temp.name) / "profile.toml"
+        write_active_profile(profile_path)
+        devices = jcan_mcp.DeviceManager()
+        can = FakePhysicalCan()
+        manager = jcan_mcp.PeriodicManager(
+            devices, asyncio.Lock(), profile_path=profile_path, can_factory=lambda _serial: can,
+        )
+        try:
+            tasks = [
+                await manager.start(
+                    "TEST", 0x123, "11 22", 10, 1500,
+                    fd=False, remote=False, brs=False, extended=False,
+                )
+                for _ in range(4)
+            ]
+            self.assertEqual(len(manager.active), 4)
+            self.assertEqual(can.started, [MODES["normal"]])
+            with self.assertRaisesRegex(JCanError, "上限 4"):
+                await manager.start(
+                    "TEST", 0x123, "11 22", 10, 1,
+                    fd=False, remote=False, brs=False, extended=False,
+                )
+            while not can.sent:
+                await asyncio.sleep(0.005)
+            await manager.close()
+            sent = len(can.sent)
+            await asyncio.sleep(0.03)
+            listing = await manager.list("TEST")
+            recent = {item["task_id"]: item for item in listing["recent"]}
+            self.assertFalse(listing["active"])
+            self.assertEqual({recent[item["task_id"]]["state"] for item in tasks}, {"stopped"})
+            self.assertEqual(len(can.sent), sent)
+            self.assertTrue(can.stopped and can.closed)
+        finally:
+            await manager.close()
+            devices.close()
+
 
 @unittest.skipUnless(os.environ.get("JCAN_TEST_SERIAL"), "set JCAN_TEST_SERIAL for HIL")
 class McpHilTest(unittest.IsolatedAsyncioTestCase):
@@ -681,6 +780,26 @@ class McpStage4PhysicalHilTest(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(result.structuredContent["data"]["rule"], "tx-7ff-zero4")
 
 
+@unittest.skipUnless(os.environ.get("JCAN_STAGE4_CAPTURE_SERIAL"), "set JCAN_STAGE4_CAPTURE_SERIAL after passive-capture preflight")
+class McpStage4CaptureHilTest(unittest.IsolatedAsyncioTestCase):
+    async def test_bounded_silent_capture(self):
+        serial = os.environ["JCAN_STAGE4_CAPTURE_SERIAL"]
+        server = StdioServerParameters(command=sys.executable, args=[str(ROOT / "jcan_mcp.py")], cwd=ROOT)
+        async with stdio_client(server) as (read, write):
+            async with ClientSession(read, write) as session:
+                await asyncio.wait_for(session.initialize(), 5)
+                result = await asyncio.wait_for(
+                    session.call_tool("jcan_capture", {"serial": serial, "duration_ms": 5000, "max_frames": 1000}),
+                    10,
+                )
+                self.assertTrue(result.structuredContent["ok"])
+                capture = result.structuredContent["data"]
+                self.assertLess(capture["duration_ms"], 6000)
+                self.assertLessEqual(capture["received_frames"], 1000)
+                self.assertEqual(capture["received_frames"], capture["matched_frames"] + capture["dropped_frames"])
+                print(json.dumps(capture, ensure_ascii=False))
+
+
 @unittest.skipUnless(os.environ.get("JCAN_STAGE4_PERIODIC_SERIAL"), "set JCAN_STAGE4_PERIODIC_SERIAL after periodic-bus safety preflight")
 class McpStage4PeriodicHilTest(unittest.IsolatedAsyncioTestCase):
     async def _run_case(self, serial, count, name):
@@ -732,4 +851,12 @@ class McpStage4PeriodicHilTest(unittest.IsolatedAsyncioTestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    if "--fake-periodic-server" in sys.argv:
+        class FakePeriodicManager(jcan_mcp.PeriodicManager):
+            def __init__(self, devices, hardware_gate):
+                super().__init__(devices, hardware_gate, can_factory=lambda _serial: LoggedFakeCan())
+
+        jcan_mcp.PeriodicManager = FakePeriodicManager
+        jcan_mcp.main()
+    else:
+        unittest.main()
