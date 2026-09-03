@@ -1,0 +1,14 @@
+safety_preflight:
+  schema_version: 1
+  timestamp_utc: "2026-09-03T07:47:16Z"
+  operation: "internal-loopback"
+  authorization: "User requested starting stage 6 on 2026-09-03; stage 6 plan explicitly includes scan, configuration read, and one bounded internal loopback"
+  target:
+    board: "JooDevice JTool-CAN ffff:0004"
+    hardware_revision: "unknown"
+    probe_or_adapter_serial: "207F346D5650"
+    transport: "can-internal-loopback"
+  artifact_or_stimulus: "source revision 23878386f9eeefbf494c27ae9b1a081bf19eb5f1; jcan_mcp.py sha256:52c038baeff7e74d81f7478fa00922c99d123c0df71646716f995ccc8b437d26; JCAN Skill sha256:587f3169954cc5e28aa363b934bd06b92c0ed5025b5e4415840c1ae5d0f2b89a"
+  limits: "Codex Agent must use registered jcan MCP only; jcan_scan then jcan_get_config for serial 207F346D5650, followed by exactly one jcan_loopback_test using three internal CAN_MODE_SILENT_LOOPBACK frames; no physical CAN/CAN-FD traffic, capture, configuration write, reboot, SDO, periodic task, Bus-Off injection, retry, or IntoBoot"
+  recovery_plan: "jcan_loopback_test issues CANStop and closes USB in finally; preserve returned evidence paths; verify the adapter remains online and all ten configuration fields equal the pre-test baseline; leave every profile frame periodic=false"
+  approved: true

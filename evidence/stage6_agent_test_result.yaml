@@ -1,0 +1,18 @@
+test_result:
+  schema_version: 1
+  source_revision: "23878386f9eeefbf494c27ae9b1a081bf19eb5f1"
+  artifact_checksums:
+    jcan_mcp.py: "52c038baeff7e74d81f7478fa00922c99d123c0df71646716f995ccc8b437d26"
+    .agents/skills/jcan/SKILL.md: "587f3169954cc5e28aa363b934bd06b92c0ed5025b5e4415840c1ae5d0f2b89a"
+  safety_preflight: "evidence/stage6_agent_hil_preflight.yaml"
+  level: "hil"
+  target: "Codex Agent -> registered jcan stdio MCP -> JTool-CAN serial 207F346D5650"
+  command: "codex exec --approve-for-me --ephemeral -C /home/gtc/Desktop/workspace/JCAN <bounded-stage6-prompt>"
+  timing: {started_at_utc: "2026-09-03T07:48:49Z", duration_ms: 53000, timeout_ms: 120000}
+  attempts: 1
+  passed: false
+  counts: {total: 3, passed: 1, failed: 0, skipped: 2}
+  classified_failures: ["HIL-HARDWARE-NOT-PRESENT"]
+  log: "evidence/stage6_validation.md"
+  coverage: "Agent skill selection, registered MCP discovery call, structured result handling, stop-on-missing-target behavior, and prohibition enforcement"
+  requirements: ["JCAN-STAGE6-AGENT-ROUTING", "JCAN-STAGE6-SCAN", "JCAN-STAGE6-READ-CONFIG", "JCAN-STAGE6-INTERNAL-LOOPBACK"]

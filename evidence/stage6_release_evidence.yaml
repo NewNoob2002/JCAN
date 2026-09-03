@@ -1,0 +1,17 @@
+release_evidence:
+  schema_version: 1
+  version: "stage-6-started-hil-hardware-not-present"
+  source_revision: "23878386f9eeefbf494c27ae9b1a081bf19eb5f1"
+  safety_preflights:
+    - "evidence/stage6_agent_hil_preflight.yaml"
+  build_outputs: []
+  deployments: []
+  debug_sessions: []
+  runtime_monitors: []
+  bus_validations: []
+  tests:
+    - "evidence/stage6_host_test_result.yaml"
+    - "evidence/stage6_agent_test_result.yaml"
+  reviews:
+    - "AGENT_INTEGRATION_PLAN.md"
+    - "evidence/stage6_validation.md"

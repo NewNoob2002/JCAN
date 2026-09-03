@@ -1,0 +1,18 @@
+test_result:
+  schema_version: 1
+  source_revision: "23878386f9eeefbf494c27ae9b1a081bf19eb5f1"
+  artifact_checksums:
+    jcan_mcp.py: "52c038baeff7e74d81f7478fa00922c99d123c0df71646716f995ccc8b437d26"
+    jcan_bus_profile.toml: "25dd865cfe573c58d4fca8aea69792d418c23a8518ad697ba06eb08f5edf1b3f"
+    .agents/skills/jcan/SKILL.md: "587f3169954cc5e28aa363b934bd06b92c0ed5025b5e4415840c1ae5d0f2b89a"
+  level: "integration"
+  target: "Linux host + MCP stdio + Fake CAN adapter"
+  command: "UV_CACHE_DIR=/tmp/jcan-uv-cache uv run python -m unittest -v"
+  timing: {started_at_utc: "2026-09-03T07:50:29Z", duration_ms: 1193, timeout_ms: 30000}
+  attempts: 1
+  passed: true
+  counts: {total: 16, passed: 11, failed: 0, skipped: 5}
+  classified_failures: []
+  log: "evidence/stage6_validation.md"
+  coverage: "MCP tool schema, stdio lifecycle, structured errors, profile gates, SDO helpers, periodic scheduling, disconnect cleanup, and stage 1-5 regression"
+  requirements: ["JCAN-STAGE6-SCHEMA-STABLE", "JCAN-STAGE6-HOST-REGRESSION"]
