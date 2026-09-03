@@ -1,7 +1,7 @@
 # JCAN Agent Skill + MCP 实施计划
 
 日期：2026-09-02  
-状态：阶段 1–5 已完成；阶段 6 已完成 MCP 注册，Agent HIL 因适配器未连接停在扫描步骤；Bus-Off 延期且物理周期授权保持关闭
+状态：阶段 1–6 已完成；Bus-Off 故障注入延期，物理周期授权保持关闭
 
 ## 目标与结论
 
@@ -162,11 +162,11 @@ Skill 只记录 Agent 真正需要的决策：
 - Skill 描述能命中 JTool-CAN 请求而不吸引普通 SocketCAN 任务。
 - 独立前向验证确认 Agent 先选择 `jcan_scan`/`jcan_get_config`，并在缺少物理发送参数或授权时停止。
 
-### 6. Codex 集成与发布门槛（进行中）
+### 6. Codex 集成与发布门槛（完成）
 
 - 已使用 `codex mcp add` 注册本地 stdio Server，`codex mcp list/get` 显示 `jcan` 为 enabled stdio。
-- Agent 已正确选择 `$jcan` 并调用 `jcan_scan`；当前未发现适配器，因此按安全规则停止，读取配置和内部回环等待设备重新连接。
-- 工具 schema 稳定、HIL 回归通过后，才考虑将 Skill 与 MCP 配置封装为插件。
+- Agent 已正确选择 `$jcan`，完成扫描 → 十项配置基线 → 一次三帧内部回环 → 十项配置复核；全程无 warning，配置逐字节不变。
+- 工具 schema 与 Host 回归稳定，Agent HIL 通过；已达到后续插件封装门槛，但阶段 6 不自动增加插件。
 
 ## 测试矩阵
 

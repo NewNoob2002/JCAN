@@ -1,0 +1,15 @@
+bus_validation:
+  schema_version: 1
+  created_at_utc: "2026-09-03T07:58:22Z"
+  safety_preflight: "evidence/stage6_agent_hil_retry_preflight.yaml"
+  interface: "can-fd"
+  adapter_or_resource: "Codex Agent -> registered jcan MCP -> JTool-CAN serial 207F346D5650, USB bus 1/address 94"
+  settings:
+    can: {nominal_bitrate: "not exercised (internal loopback)", data_bitrate: "not exercised (internal loopback)", listen_only: true}
+  requirements: ["JCAN-STAGE6-AGENT-HIL", "JCAN-MCP-LOOPBACK", "JCAN-CONFIG-UNCHANGED"]
+  stimulus: "Exactly one CAN_MODE_SILENT_LOOPBACK run: standard classic ID 0x123 DLC 4; extended classic ID 0x18FF0011 DLC 8; standard CAN FD+BRS ID 0x321 DLC 12"
+  measurements_or_responses: "3/3 exact loopback frames; every MCP result ok=true with no warnings; all ten configuration fields identical before and after"
+  raw_capture: "evidence/runtime/20260903T075742.013953Z-1788422262013976075-scan.json; evidence/runtime/20260903T075755.015159Z-1788422275015216334-get_config.json; evidence/runtime/20260903T075811.876927Z-1788422291876947667-loopback_test.json; evidence/runtime/20260903T075822.986373Z-1788422302986399872-get_config.json"
+  report: "evidence/stage6_validation.md"
+  cleanup: {required: true, completed: true, final_state: "CANStop and USB close completed; adapter remained readable; all ten configuration fields unchanged; physical periodic authorization remains false"}
+  passed: true

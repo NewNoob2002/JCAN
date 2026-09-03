@@ -1,0 +1,14 @@
+safety_preflight:
+  schema_version: 1
+  timestamp_utc: "2026-09-03T07:56:14Z"
+  operation: "internal-loopback"
+  authorization: "User reported JTool-CAN reconnected on 2026-09-03, authorizing one new attempt to complete the existing stage 6 scan, configuration-read, and bounded internal-loopback plan"
+  target:
+    board: "JooDevice JTool-CAN ffff:0004"
+    hardware_revision: "unknown"
+    probe_or_adapter_serial: "207F346D5650"
+    transport: "can-internal-loopback"
+  artifact_or_stimulus: "source revision e7434173600c5596e558916b150c8dd6e2cee22a; jcan_mcp.py sha256:52c038baeff7e74d81f7478fa00922c99d123c0df71646716f995ccc8b437d26; JCAN Skill sha256:587f3169954cc5e28aa363b934bd06b92c0ed5025b5e4415840c1ae5d0f2b89a; profile sha256:25dd865cfe573c58d4fca8aea69792d418c23a8518ad697ba06eb08f5edf1b3f"
+  limits: "One Codex Agent attempt using registered jcan MCP only: jcan_scan, jcan_get_config for serial 207F346D5650, exactly one jcan_loopback_test with three internal CAN_MODE_SILENT_LOOPBACK frames, then one read-only jcan_get_config postflight comparison; no physical CAN/CAN-FD traffic, capture, configuration write, reboot, SDO, periodic task, Bus-Off injection, additional retry, or IntoBoot"
+  recovery_plan: "jcan_loopback_test issues CANStop and closes USB in finally; stop on ok=false or warnings; compare all ten postflight configuration fields to baseline; leave every profile frame periodic=false"
+  approved: true

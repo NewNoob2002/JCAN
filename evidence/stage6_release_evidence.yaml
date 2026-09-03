@@ -1,17 +1,20 @@
 release_evidence:
   schema_version: 1
-  version: "stage-6-started-hil-hardware-not-present"
-  source_revision: "23878386f9eeefbf494c27ae9b1a081bf19eb5f1"
+  version: "stage-6-codex-integration-hil-passed"
+  source_revision: "e7434173600c5596e558916b150c8dd6e2cee22a"
   safety_preflights:
     - "evidence/stage6_agent_hil_preflight.yaml"
+    - "evidence/stage6_agent_hil_retry_preflight.yaml"
   build_outputs: []
   deployments: []
   debug_sessions: []
   runtime_monitors: []
-  bus_validations: []
+  bus_validations:
+    - "evidence/stage6_agent_hil_bus_validation.yaml"
   tests:
     - "evidence/stage6_host_test_result.yaml"
     - "evidence/stage6_agent_test_result.yaml"
+    - "evidence/stage6_agent_hil_test_result.yaml"
   reviews:
     - "AGENT_INTEGRATION_PLAN.md"
     - "evidence/stage6_validation.md"

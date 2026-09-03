@@ -35,9 +35,28 @@ Agent 按 Skill 规则停止，没有调用 `jcan_get_config` 或 `jcan_loopback
 完整回归 16 项：11 通过、5 项硬件门控跳过、0 失败，耗时 1.193 秒。MCP schema
 及已有生命周期、profile、SDO 和周期调度契约保持稳定。
 
+## 重新连接后的 Agent HIL
+
+操作者重新连接适配器后创建新的单次预检。Codex Agent 再次正确选择 `$jcan`，并严格执行：
+
+1. `jcan_scan`：发现唯一适配器 `207F346D5650`，USB bus 1/address 94。
+2. `jcan_get_config`：读取十项原始配置基线。
+3. `jcan_loopback_test`：仅调用一次，返回标准经典 CAN、扩展经典 CAN 和标准 CAN FD+BRS
+   三帧，ID 分别为 `0x123`、`0x18FF0011`、`0x321`。
+4. `jcan_get_config`：回环后再次读取，十项配置与基线逐字节一致。
+
+四项调用均为 `ok=true`、warning 为空。原始证据：
+
+- `evidence/runtime/20260903T075742.013953Z-1788422262013976075-scan.json`
+- `evidence/runtime/20260903T075755.015159Z-1788422275015216334-get_config.json`
+- `evidence/runtime/20260903T075811.876927Z-1788422291876947667-loopback_test.json`
+- `evidence/runtime/20260903T075822.986373Z-1788422302986399872-get_config.json`
+
+没有重试或调用抓包、物理发送、SDO、周期、配置写入、重启、Bus-Off 或 IntoBoot。
+
 ## 当前结论
 
-阶段 6 的 MCP 注册、Codex Agent 路由和缺失设备停止边界已通过。完整的
-“扫描 → 配置读取 → 内部回环”HIL 尚未完成；重新连接序列号 `207F346D5650` 后，
-应创建新的或确认仍适用的预检，并从一次新的 `jcan_scan` 开始，不沿用本次空扫描结果。
-物理周期授权仍为 `periodic=false`，插件封装门槛尚未达到。
+阶段 6 已完成：MCP 注册、`list/get` 检查、Agent Skill 路由、缺失设备安全停止、重新连接后
+的扫描/配置读取/内部回环/配置复核以及 Host 回归均通过。物理周期授权仍为
+`periodic=false`。工具 schema 与 HIL 已达到后续插件封装门槛；插件本身不属于本阶段，
+未自动创建。Bus-Off 故障注入继续延期。

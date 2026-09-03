@@ -1,0 +1,19 @@
+test_result:
+  schema_version: 1
+  source_revision: "e7434173600c5596e558916b150c8dd6e2cee22a"
+  artifact_checksums:
+    jcan_mcp.py: "52c038baeff7e74d81f7478fa00922c99d123c0df71646716f995ccc8b437d26"
+    jcan_bus_profile.toml: "25dd865cfe573c58d4fca8aea69792d418c23a8518ad697ba06eb08f5edf1b3f"
+    .agents/skills/jcan/SKILL.md: "587f3169954cc5e28aa363b934bd06b92c0ed5025b5e4415840c1ae5d0f2b89a"
+  safety_preflight: "evidence/stage6_agent_hil_retry_preflight.yaml"
+  level: "hil"
+  target: "Codex Agent -> registered jcan stdio MCP -> JTool-CAN serial 207F346D5650"
+  command: "codex exec --approve-for-me --ephemeral -C /home/gtc/Desktop/workspace/JCAN <bounded-stage6-retry-prompt>"
+  timing: {started_at_utc: "2026-09-03T07:57:07Z", duration_ms: 76000, timeout_ms: 120000}
+  attempts: 1
+  passed: true
+  counts: {total: 4, passed: 4, failed: 0, skipped: 0}
+  classified_failures: []
+  log: "evidence/stage6_validation.md"
+  coverage: "Agent skill selection, registered MCP scan, exact serial selection, ten-field baseline, one three-frame internal loopback, ten-field postflight comparison, stop/cleanup, and prohibited-operation boundary"
+  requirements: ["JCAN-STAGE6-AGENT-ROUTING", "JCAN-STAGE6-SCAN", "JCAN-STAGE6-READ-CONFIG", "JCAN-STAGE6-INTERNAL-LOOPBACK", "JCAN-STAGE6-CONFIG-UNCHANGED"]
