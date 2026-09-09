@@ -1,0 +1,36 @@
+bus_validation:
+  schema_version: 1
+  created_at_utc: "2026-09-04T07:52:40Z"
+  safety_preflight: "evidence/stage7_periodic_attempt3_preflight.yaml"
+  interface: "can"
+  adapter_or_resource: "JTool-CAN serial 207F346D5650"
+  settings:
+    can:
+      nominal_bitrate: 500000
+      data_bitrate: 0
+      listen_only: false
+  requirements:
+    - "bounded periodic CANopen same-value traffic"
+    - "post-run object integrity"
+  stimulus: "Classic CAN ID 0x601, DLC 8, data 2B 08 20 00 C8 00 00 00; 50 ms; 1200 then 1500 frames"
+  measurements_or_responses:
+    run_1200:
+      sent_count: 1200
+      missed_periods: 0
+      jitter_ms: {min: 0.05247125227469951, avg: 0.8055321737568496, max: 2.74686232660315}
+      value_before: 200
+      value_after: 200
+    run_1500:
+      sent_count: 1500
+      missed_periods: 0
+      jitter_ms: {min: 0.06034796388121322, avg: 0.8444571366926539, max: 2.431692926620599}
+      value_before: 200
+      value_after: 200
+  raw_capture:
+    - "evidence/runtime/20260904T075012.779064Z-1788508212779080731-periodic_run.json"
+    - "evidence/runtime/20260904T075128.353329Z-1788508288353361890-periodic_run.json"
+  cleanup:
+    required: true
+    completed: true
+    final_state: "CAN stopped, USB closed, no cleanup errors; 15376 receive bytes drained after each run"
+  passed: true

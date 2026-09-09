@@ -1,0 +1,18 @@
+safety_preflight:
+  schema_version: 1
+  timestamp_utc: "2026-09-04T07:41:20Z"
+  operation: "bus-write"
+  authorization: "User explicitly authorized retry of hardware test 5 after attempt-1 failure classification"
+  target:
+    board: "CANopen Node 1 on JCAN physical bus"
+    hardware_revision: "unknown"
+    probe_or_adapter_serial: "207F346D5650"
+    transport: "can"
+  artifact_or_stimulus: "Standard Classic CAN ID 0x601, DLC 8, expedited U16 same-value SDO download 2B 08 20 00 C8 00 00 00"
+  artifact_checksums:
+    jcan.py: "aeb7d834d8a02644e102ee6133d3d29e46b53e74ab26cf057ee61328715f29d1"
+    jcan_mcp.py: "def1f28b88fc7bd207ac012cc775cd654e9ffc97bd858531b27379bc7f2fc22c"
+    test_jcan_mcp.py: "0a9fb90833b1680625c691756fa983826c7652fdae3dce3e860b6e114429310a"
+  limits: "One retry attempt; 500 kbit/s nominal; 50 ms period; 1200 frames then 1500 frames; no EEPROM save; total 2700 periodic frames"
+  recovery_plan: "MCP drains receive data for at most 2000 ms, then stops CAN and closes USB on completion/failure; read 0x2008:00 before and after each run and require value 200"
+  approved: true

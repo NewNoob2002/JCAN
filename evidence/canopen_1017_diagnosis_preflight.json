@@ -1,0 +1,25 @@
+{
+  "serial": "207F346D5650",
+  "transport": "JCAN MCP",
+  "nominal_bitrate_declared": 500000,
+  "baseline_evidence": "evidence/runtime/20260907T042006.827007Z-1788754806827026143-get_config.json",
+  "baseline_object_evidence": "evidence/runtime/20260907T042104.183284Z-1788754864183310143-sdo_read.json",
+  "operation": "jcan_sdo_u16_same_value_test",
+  "node": 1,
+  "index": 4119,
+  "subindex": 0,
+  "baseline_value": 1000,
+  "stimulus": {
+    "can_id": 1537,
+    "extended": false,
+    "fd": false,
+    "remote": false,
+    "brs": false,
+    "dlc": 8,
+    "data": "2B 17 10 00 E8 03 00 00",
+    "download_count": 1
+  },
+  "bounds": "one upload, one same-value download, one verification upload; existing 2 second SDO deadlines",
+  "recovery": "same value only; no EEPROM save; CANStop and USB close in cleanup; stop on error, no retry",
+  "authorization": "User requests investigation of JCAN sending this exact frame to the driver; same-value diagnostic preserves current 1000 value."
+}

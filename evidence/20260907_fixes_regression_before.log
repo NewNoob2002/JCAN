@@ -1,0 +1,108 @@
+test_sdo_batched_unrelated_response (test_jcan_mcp.McpHostTest.test_sdo_batched_unrelated_response) ...
+  test_sdo_batched_unrelated_response (test_jcan_mcp.McpHostTest.test_sdo_batched_unrelated_response) (same_value=False) ... ERROR
+  test_sdo_batched_unrelated_response (test_jcan_mcp.McpHostTest.test_sdo_batched_unrelated_response) (same_value=True) ... ERROR
+test_periodic_holds_gate_until_cleanup_finishes (test_jcan_mcp.McpHostTest.test_periodic_holds_gate_until_cleanup_finishes) ... FAIL
+test_periodic_startup_failure_always_stops_and_closes (test_jcan_mcp.McpHostTest.test_periodic_startup_failure_always_stops_and_closes) ...
+  test_periodic_startup_failure_always_stops_and_closes (test_jcan_mcp.McpHostTest.test_periodic_startup_failure_always_stops_and_closes) (stop_fails=False, close_fails=False) ... FAIL
+  test_periodic_startup_failure_always_stops_and_closes (test_jcan_mcp.McpHostTest.test_periodic_startup_failure_always_stops_and_closes) (stop_fails=True, close_fails=False) ... FAIL
+  test_periodic_startup_failure_always_stops_and_closes (test_jcan_mcp.McpHostTest.test_periodic_startup_failure_always_stops_and_closes) (stop_fails=False, close_fails=True) ... FAIL
+  test_periodic_startup_failure_always_stops_and_closes (test_jcan_mcp.McpHostTest.test_periodic_startup_failure_always_stops_and_closes) (stop_fails=True, close_fails=True) ... FAIL
+
+======================================================================
+ERROR: test_sdo_batched_unrelated_response (test_jcan_mcp.McpHostTest.test_sdo_batched_unrelated_response) (same_value=False)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gtc/Desktop/workspace/JCAN/test_jcan_mcp.py", line 708, in test_sdo_batched_unrelated_response
+    result = operation("TEST", 1, 0x1017, 0, can_factory=lambda _: can)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gtc/Desktop/workspace/JCAN/jcan_mcp.py", line 768, in _sdo_read
+    value, response = sdo_read(can, parser, node, index, subindex)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gtc/Desktop/workspace/JCAN/jcan.py", line 507, in sdo_read
+    frame = wait_frame(can, parser, 0x580 + node, max(0, deadline - time.monotonic()))
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gtc/Desktop/workspace/JCAN/jcan.py", line 425, in wait_frame
+    raise JCanError(f"等待 CAN ID {can_id:03X} 超时")
+jcan.JCanError: 等待 CAN ID 581 超时
+
+======================================================================
+ERROR: test_sdo_batched_unrelated_response (test_jcan_mcp.McpHostTest.test_sdo_batched_unrelated_response) (same_value=True)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gtc/Desktop/workspace/JCAN/test_jcan_mcp.py", line 708, in test_sdo_batched_unrelated_response
+    result = operation("TEST", 1, 0x1017, 0, can_factory=lambda _: can)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gtc/Desktop/workspace/JCAN/jcan_mcp.py", line 792, in _sdo_u16_same_value_test
+    baseline, first_upload = sdo_read(can, parser, node, index, subindex)
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gtc/Desktop/workspace/JCAN/jcan.py", line 507, in sdo_read
+    frame = wait_frame(can, parser, 0x580 + node, max(0, deadline - time.monotonic()))
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gtc/Desktop/workspace/JCAN/jcan.py", line 425, in wait_frame
+    raise JCanError(f"等待 CAN ID {can_id:03X} 超时")
+jcan.JCanError: 等待 CAN ID 581 超时
+
+======================================================================
+FAIL: test_periodic_holds_gate_until_cleanup_finishes (test_jcan_mcp.McpHostTest.test_periodic_holds_gate_until_cleanup_finishes)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/unittest/async_case.py", line 90, in _callTestMethod
+    if self._callMaybeAsync(method) is not None:
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/unittest/async_case.py", line 112, in _callMaybeAsync
+    return self._asyncioRunner.run(
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/gtc/Desktop/workspace/JCAN/test_jcan_mcp.py", line 737, in test_periodic_holds_gate_until_cleanup_finishes
+    self.assertTrue(gate.locked())
+AssertionError: False is not true
+
+======================================================================
+FAIL: test_periodic_startup_failure_always_stops_and_closes (test_jcan_mcp.McpHostTest.test_periodic_startup_failure_always_stops_and_closes) (stop_fails=False, close_fails=False)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gtc/Desktop/workspace/JCAN/test_jcan_mcp.py", line 768, in test_periodic_startup_failure_always_stops_and_closes
+    stop.assert_called_once_with()
+  File "/usr/lib/python3.12/unittest/mock.py", line 955, in assert_called_once_with
+    raise AssertionError(msg)
+AssertionError: Expected 'stop' to be called once. Called 0 times.
+
+======================================================================
+FAIL: test_periodic_startup_failure_always_stops_and_closes (test_jcan_mcp.McpHostTest.test_periodic_startup_failure_always_stops_and_closes) (stop_fails=True, close_fails=False)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gtc/Desktop/workspace/JCAN/test_jcan_mcp.py", line 768, in test_periodic_startup_failure_always_stops_and_closes
+    stop.assert_called_once_with()
+  File "/usr/lib/python3.12/unittest/mock.py", line 955, in assert_called_once_with
+    raise AssertionError(msg)
+AssertionError: Expected 'stop' to be called once. Called 0 times.
+
+======================================================================
+FAIL: test_periodic_startup_failure_always_stops_and_closes (test_jcan_mcp.McpHostTest.test_periodic_startup_failure_always_stops_and_closes) (stop_fails=False, close_fails=True)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gtc/Desktop/workspace/JCAN/test_jcan_mcp.py", line 768, in test_periodic_startup_failure_always_stops_and_closes
+    stop.assert_called_once_with()
+  File "/usr/lib/python3.12/unittest/mock.py", line 955, in assert_called_once_with
+    raise AssertionError(msg)
+AssertionError: Expected 'stop' to be called once. Called 0 times.
+
+======================================================================
+FAIL: test_periodic_startup_failure_always_stops_and_closes (test_jcan_mcp.McpHostTest.test_periodic_startup_failure_always_stops_and_closes) (stop_fails=True, close_fails=True)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gtc/Desktop/workspace/JCAN/test_jcan_mcp.py", line 768, in test_periodic_startup_failure_always_stops_and_closes
+    stop.assert_called_once_with()
+  File "/usr/lib/python3.12/unittest/mock.py", line 955, in assert_called_once_with
+    raise AssertionError(msg)
+AssertionError: Expected 'stop' to be called once. Called 0 times.
+
+----------------------------------------------------------------------
+Ran 3 tests in 4.028s
+
+FAILED (failures=5, errors=2)

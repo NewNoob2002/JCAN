@@ -1,4 +1,4 @@
 interface:
   display_name: "JCAN"
-  short_description: "Safely operate JTool-CAN adapters through the local MCP server"
-  default_prompt: "Use $jcan to inspect a JTool-CAN adapter safely and choose the least-risk operation."
+  short_description: "Operate JTool-CAN adapters through the Rust CLI"
+  default_prompt: "Use $jcan and the Rust jcan CLI with an explicit serial, JSON output, bounded operations, and safe cleanup."

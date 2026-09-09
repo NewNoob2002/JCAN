@@ -1,0 +1,18 @@
+{
+  "authorization": "User explicitly authorized 10 frames, 100 ms period, standard Classic CAN 0x123 payload 11 22 33 44",
+  "serial": "207F346D5650",
+  "transport": "JCAN MCP",
+  "baseline": "runtime/20260907T061920.359364Z-1788761960359392115-get_config.json",
+  "frame": {
+    "can_id": 291,
+    "data_hex": "11 22 33 44",
+    "extended": false,
+    "fd": false,
+    "remote": false,
+    "brs": false
+  },
+  "count": 10,
+  "period_ms": 100,
+  "recovery": "One start invocation; no retry. Bounded completion, stop task if still active, CANStop and USB close. Stop on errors/warnings; preserve evidence.",
+  "verification": "Inspect final task status and cleanup then compare configuration. No independent receiver attached by this test."
+}

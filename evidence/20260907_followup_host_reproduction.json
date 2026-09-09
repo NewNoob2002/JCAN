@@ -1,0 +1,18 @@
+{
+  "scope": "host-only simulated devices",
+  "batched_sdo_response_loss": {
+    "upload": "等待 CAN ID 581 超时",
+    "download": "等待 CAN ID 581 超时"
+  },
+  "hardware_gate_released_before_cleanup": {
+    "gate_locked": false,
+    "active": false,
+    "stopped": false,
+    "closed": false
+  },
+  "startup_failure_missing_CANStop": {
+    "started": true,
+    "closed": true,
+    "CANStop_called": false
+  }
+}

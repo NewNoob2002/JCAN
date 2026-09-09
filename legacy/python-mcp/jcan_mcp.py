@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Safety-bounded stdio MCP server for JooDevice JTool-CAN adapters."""
+"""Full-capability stdio MCP server for JooDevice JTool-CAN adapters."""
 
 import asyncio
 import json
@@ -14,6 +14,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from threading import Event
 from typing import Any
 
 from mcp.server.fastmcp import Context, FastMCP
@@ -32,6 +33,7 @@ from jcan import (
     sdo_write,
     run_loopback_test,
     self_test,
+    validate_frame,
 )
 
 
@@ -63,6 +65,12 @@ CONFIG_ARGUMENTS = {
     "hardware_version",
     "device_id",
 }
+MIN_PERIOD_MS = 10
+MAX_PERIOD_MS = 60000
+MAX_PERIODIC_COUNT = 1500
+MAX_PERIODIC_TASKS = 4
+MAX_CAPTURE_MS = 600000
+MAX_CAPTURE_FRAMES = 100000
 
 
 class RecoverableOperationError(JCanError):
@@ -280,11 +288,21 @@ class DeviceManager:
         self.executor.shutdown(wait=True, cancel_futures=True)
 
 
+def _drain_receive(can: JCan, timeout_ms: int = 2000) -> int:
+    deadline = time.monotonic() + timeout_ms / 1000
+    drained = 0
+    while time.monotonic() < deadline:
+        data = can.receive(min(10, max(1, int((deadline - time.monotonic()) * 1000))))
+        if not data:
+            return drained
+        drained += len(data)
+    raise JCanError(f"接收队列未在 {timeout_ms} ms 内清空")
+
+
 @dataclass
 class PeriodicEntry:
     task_id: str
     serial: str
-    rule: str
     can_id: int
     data: bytes
     fd: bool
@@ -309,7 +327,6 @@ class PeriodicEntry:
         result = {
             "task_id": self.task_id,
             "serial": self.serial,
-            "rule": self.rule,
             "frame": {
                 "id": self.can_id, "data": self.data.hex(" ").upper(), "fd": self.fd,
                 "remote": self.remote, "brs": self.brs, "extended": self.extended,
@@ -339,15 +356,14 @@ class PeriodicEntry:
 
 
 class PeriodicManager:
-    """Run profile-approved periodic frames through one persistent CAN session."""
+    """Run bounded periodic frames through one persistent CAN session."""
 
     def __init__(
         self, devices: DeviceManager, hardware_gate: asyncio.Lock, *,
-        profile_path: Path | None = None, can_factory: Callable[[str], JCan] | None = None,
+        can_factory: Callable[[str], JCan] | None = None,
     ):
         self.devices = devices
         self.hardware_gate = hardware_gate
-        self.profile_path = profile_path
         self.can_factory = can_factory or (lambda serial: JCan(LibUsb(), serial))
         self.active: dict[str, PeriodicEntry] = {}
         self.recent: list[dict[str, Any]] = []
@@ -355,7 +371,7 @@ class PeriodicManager:
         self.wakeup = asyncio.Event()
         self.runner: asyncio.Task[None] | None = None
         self.startup: asyncio.Future[None] | None = None
-        self.profile: BusProfile | None = None
+        self.serial: str | None = None
         self.closing = False
         self.cleanup_error: str | None = None
         self.next_id = 1
@@ -367,16 +383,12 @@ class PeriodicManager:
         self, serial: str, can_id: int, data_hex: str, period_ms: int, count: int, *,
         fd: bool, remote: bool, brs: bool, extended: bool,
     ) -> dict[str, Any]:
-        profile = _load_profile(self.profile_path)
-        profile.require_enabled(serial)
         data = _payload(data_hex)
-        rule = profile.tx_rule(can_id, data, extended=extended, fd=fd, brs=brs, remote=remote)
-        if not rule.periodic:
-            raise JCanError(f"frame 规则 {rule.name} 未授权周期发送")
-        if not isinstance(period_ms, int) or isinstance(period_ms, bool) or not profile.min_period_ms <= period_ms <= 60000:
-            raise JCanError(f"period_ms 范围必须是 {profile.min_period_ms}..60000")
-        if not isinstance(count, int) or isinstance(count, bool) or not 1 <= count <= 1500:
-            raise JCanError("count 范围必须是 1..1500")
+        validate_frame(can_id, data, fd=fd, remote=remote, brs=brs, extended=extended)
+        if not isinstance(period_ms, int) or isinstance(period_ms, bool) or not MIN_PERIOD_MS <= period_ms <= MAX_PERIOD_MS:
+            raise JCanError(f"period_ms 范围必须是 {MIN_PERIOD_MS}..{MAX_PERIOD_MS}")
+        if not isinstance(count, int) or isinstance(count, bool) or not 1 <= count <= MAX_PERIODIC_COUNT:
+            raise JCanError(f"count 范围必须是 1..{MAX_PERIODIC_COUNT}")
 
         while True:
             wait_for_runner = None
@@ -384,15 +396,15 @@ class PeriodicManager:
                 if self.closing and self.runner:
                     wait_for_runner = self.runner
                 else:
-                    if len(self.active) >= profile.max_periodic_tasks:
-                        raise JCanError(f"周期任务数已达到 profile 上限 {profile.max_periodic_tasks}")
-                    if self.profile is not None and self.profile != profile:
-                        raise JCanError("运行中的周期会话与当前 profile 不一致")
+                    if len(self.active) >= MAX_PERIODIC_TASKS:
+                        raise JCanError(f"周期任务数已达到上限 {MAX_PERIODIC_TASKS}")
+                    if self.serial is not None and self.serial != serial:
+                        raise JCanError(f"周期会话正在使用适配器 {self.serial}")
                     loop = asyncio.get_running_loop()
                     task_id = f"periodic-{self.next_id}"
                     self.next_id += 1
                     entry = PeriodicEntry(
-                        task_id, serial, rule.name, can_id, data, fd, remote, brs, extended,
+                        task_id, serial, can_id, data, fd, remote, brs, extended,
                         period_ms, count, loop.create_future(),
                     )
                     if self.runner and not self.runner.done():
@@ -401,10 +413,10 @@ class PeriodicManager:
                     self.active[task_id] = entry
                     self.wakeup.set()
                     if not self.runner or self.runner.done():
-                        self.profile = profile
+                        self.serial = serial
                         self.cleanup_error = None
                         self.startup = loop.create_future()
-                        self.runner = loop.create_task(self._run(serial, profile, self.startup))
+                        self.runner = loop.create_task(self._run(serial, self.startup))
                     startup = self.startup
                     break
             if wait_for_runner:
@@ -454,14 +466,25 @@ class PeriodicManager:
         if runner:
             await runner
 
-    def _open(self, serial: str, profile: BusProfile) -> JCan:
+    def _open(self, serial: str) -> JCan:
         can = self.can_factory(serial)
         try:
-            profile.verify_config(can)
+            can.enable_receive()
             can.start(MODES["normal"])
+            _drain_receive(can)
             return can
-        except Exception:
-            can.close()
+        except Exception as exc:
+            cleanup_errors = []
+            for name, cleanup in (("CANStop", can.stop), ("USB close", can.close)):
+                try:
+                    cleanup()
+                except Exception as cleanup_exc:
+                    cleanup_errors.append(f"{name}: {cleanup_exc}")
+            if cleanup_errors:
+                raise RecoverableOperationError(
+                    f"周期启动失败: {exc}; 清理失败: {'; '.join(cleanup_errors)}",
+                    {"cleanup_errors": cleanup_errors},
+                ) from exc
             raise
 
     def _finish_locked(self, entry: PeriodicEntry, state: str, error: Exception | None = None) -> dict[str, Any]:
@@ -479,13 +502,13 @@ class PeriodicManager:
             entry.done.set_result(summary)
         return summary
 
-    async def _run(self, serial: str, profile: BusProfile, startup: asyncio.Future[None]) -> None:
+    async def _run(self, serial: str, startup: asyncio.Future[None]) -> None:
         can = None
         session_zero = 0.0
         failure = None
-        try:
-            async with self.hardware_gate:
-                can = await self.devices.run(self._open, serial, profile)
+        async with self.hardware_gate:
+            try:
+                can = await self.devices.run(self._open, serial)
                 loop = asyncio.get_running_loop()
                 session_zero = loop.time()
                 async with self.lock:
@@ -547,38 +570,47 @@ class PeriodicManager:
                                     skipped = int((finished - entry.next_deadline) // period) + 1
                                     entry.missed_periods += skipped
                                     entry.next_deadline += skipped * period
-        except Exception as exc:
-            failure = exc
-            async with self.lock:
-                if not startup.done():
-                    startup.set_exception(exc)
-                for entry in list(self.active.values()):
-                    self._finish_locked(entry, "failed", exc)
-        finally:
-            cleanup_errors = []
-            if can is not None:
-                try:
-                    await self.devices.run(can.stop)
-                except Exception as exc:
-                    cleanup_errors.append(f"CANStop: {exc}")
-                try:
-                    await self.devices.run(can.close)
-                except Exception as exc:
-                    cleanup_errors.append(f"USB close: {exc}")
-            self.cleanup_error = "; ".join(cleanup_errors) or None
-            _result(
-                "periodic_session", serial,
-                data={"cleanup_state": "stopped", "cleanup_errors": cleanup_errors},
-                error=JCanError(self.cleanup_error) if self.cleanup_error else None,
-            )
-            async with self.lock:
-                if not startup.done():
-                    startup.set_exception(failure or JCanError("周期会话未启动"))
-                self.runner = None
-                self.startup = None
-                self.profile = None
-                self.closing = False
-                self.wakeup.set()
+            except Exception as exc:
+                failure = exc
+                async with self.lock:
+                    if not startup.done():
+                        startup.set_exception(exc)
+                    for entry in list(self.active.values()):
+                        self._finish_locked(entry, "failed", exc)
+            finally:
+                cleanup_errors = list(getattr(failure, "data", {}).get("cleanup_errors", []))
+                drained_receive_bytes = 0
+                if can is not None:
+                    try:
+                        drained_receive_bytes = await self.devices.run(_drain_receive, can)
+                    except Exception as exc:
+                        cleanup_errors.append(f"receive drain: {exc}")
+                    try:
+                        await self.devices.run(can.stop)
+                    except Exception as exc:
+                        cleanup_errors.append(f"CANStop: {exc}")
+                    try:
+                        await self.devices.run(can.close)
+                    except Exception as exc:
+                        cleanup_errors.append(f"USB close: {exc}")
+                self.cleanup_error = "; ".join(cleanup_errors) or None
+                _result(
+                    "periodic_session", serial,
+                    data={
+                        "cleanup_state": "failed" if cleanup_errors else "stopped",
+                        "cleanup_errors": cleanup_errors,
+                        "drained_receive_bytes": drained_receive_bytes,
+                    },
+                    error=JCanError(self.cleanup_error) if self.cleanup_error else None,
+                )
+                async with self.lock:
+                    if not startup.done():
+                        startup.set_exception(failure or JCanError("周期会话未启动"))
+                    self.runner = None
+                    self.startup = None
+                    self.serial = None
+                    self.closing = False
+                    self.wakeup.set()
 
 
 @dataclass
@@ -730,126 +762,98 @@ def _sdo_target(node: int, index: int, subindex: int) -> None:
         raise JCanError("SDO subindex 范围必须是 0..255")
 
 
-def _sdo_rx_rule(profile: BusProfile, node: int, data: bytes) -> FrameRule:
-    frame = {
-        "id": 0x580 + node, "data": data, "fd": False, "remote": False,
-        "brs": False, "extended": False,
-    }
-    for rule in profile.frames:
-        if rule.direction == "rx" and rule.matches(
-            frame["id"], data, extended=False, fd=False, brs=False, remote=False,
-        ):
-            return rule
-    raise JCanError("SDO 响应未匹配 profile RX 白名单")
-
-
 def _sdo_read(
-    serial: str, node: int, index: int, subindex: int, *, profile_path: Path | None = None,
+    serial: str, node: int, index: int, subindex: int, *,
     can_factory: Callable[[str], JCan] | None = None,
 ) -> dict[str, Any]:
     _sdo_target(node, index, subindex)
-    profile = _load_profile(profile_path)
-    profile.require_enabled(serial)
     request = struct.pack("<BHB4x", 0x40, index, subindex)
-    tx_rule = profile.tx_rule(0x600 + node, request, extended=False, fd=False, brs=False, remote=False)
     factory = can_factory or (lambda selected: JCan(LibUsb(), selected))
     parser = CanStreamParser()
     with factory(serial) as can:
-        profile.verify_config(can)
         can.enable_receive()
         can.start(MODES["normal"])
         try:
+            drained_receive_bytes = _drain_receive(can)
             value, response = sdo_read(can, parser, node, index, subindex)
-            rx_rule = _sdo_rx_rule(profile, node, response)
         finally:
             can.stop()
     return {
-        "profile": profile.name, "node": node, "index": index, "subindex": subindex,
+        "node": node, "index": index, "subindex": subindex,
         "value_hex": value.hex(" ").upper(), "value_unsigned": int.from_bytes(value, "little"),
         "request": request.hex(" ").upper(), "response": response.hex(" ").upper(),
-        "tx_rule": tx_rule.name, "rx_rule": rx_rule.name,
+        "drained_receive_bytes": drained_receive_bytes,
     }
 
 
 def _sdo_u16_same_value_test(
-    serial: str, node: int, index: int, subindex: int, *, profile_path: Path | None = None,
+    serial: str, node: int, index: int, subindex: int, *,
     can_factory: Callable[[str], JCan] | None = None,
 ) -> dict[str, Any]:
     _sdo_target(node, index, subindex)
-    profile = _load_profile(profile_path)
-    profile.require_enabled(serial)
     upload = struct.pack("<BHB4x", 0x40, index, subindex)
-    upload_rule = profile.tx_rule(0x600 + node, upload, extended=False, fd=False, brs=False, remote=False)
     factory = can_factory or (lambda selected: JCan(LibUsb(), selected))
     parser = CanStreamParser()
     with factory(serial) as can:
-        profile.verify_config(can)
         can.enable_receive()
         can.start(MODES["normal"])
         try:
+            drained_receive_bytes = _drain_receive(can)
             baseline, first_upload = sdo_read(can, parser, node, index, subindex)
-            first_rx_rule = _sdo_rx_rule(profile, node, first_upload)
             if len(baseline) != 2:
                 raise JCanError(f"SDO 对象不是 U16: 返回 {len(baseline)} 字节")
             download = struct.pack("<BHB", 0x2B, index, subindex) + baseline + b"\0\0"
-            download_rule = profile.tx_rule(
-                0x600 + node, download, extended=False, fd=False, brs=False, remote=False,
-            )
             download_response = sdo_write(can, parser, node, index, subindex, baseline)
-            download_rx_rule = _sdo_rx_rule(profile, node, download_response)
             verified, second_upload = sdo_read(can, parser, node, index, subindex)
-            second_rx_rule = _sdo_rx_rule(profile, node, second_upload)
             if verified != baseline:
                 raise JCanError("SDO 同值写入后回读不匹配")
         finally:
             can.stop()
     return {
-        "profile": profile.name, "node": node, "index": index, "subindex": subindex,
+        "node": node, "index": index, "subindex": subindex,
         "value_hex": baseline.hex(" ").upper(), "value_unsigned": int.from_bytes(baseline, "little"),
         "write_changed_value": False, "eeprom_save": False,
+        "drained_receive_bytes": drained_receive_bytes,
         "requests": [upload.hex(" ").upper(), download.hex(" ").upper(), upload.hex(" ").upper()],
         "responses": [first_upload.hex(" ").upper(), download_response.hex(" ").upper(), second_upload.hex(" ").upper()],
-        "rules": [upload_rule.name, first_rx_rule.name, download_rule.name, download_rx_rule.name, second_rx_rule.name],
     }
 
 
 def _send_once(
     serial: str, can_id: int, data_hex: str, *, fd: bool, remote: bool, brs: bool, extended: bool,
-    profile_path: Path | None = None, can_factory: Callable[[str], JCan] | None = None,
+    settle_ms: int = 0,
+    can_factory: Callable[[str], JCan] | None = None,
 ) -> dict[str, Any]:
-    profile = _load_profile(profile_path)
-    profile.require_enabled(serial)
     data = _payload(data_hex)
-    rule = profile.tx_rule(can_id, data, extended=extended, fd=fd, brs=brs, remote=remote)
+    validate_frame(can_id, data, fd=fd, remote=remote, brs=brs, extended=extended)
+    if not isinstance(settle_ms, int) or isinstance(settle_ms, bool) or not 0 <= settle_ms <= 2000:
+        raise JCanError("settle_ms 范围必须是 0..2000")
     factory = can_factory or (lambda selected: JCan(LibUsb(), selected))
     with factory(serial) as can:
-        profile.verify_config(can)
-        can.start(MODES["normal"])
         try:
+            can.start(MODES["normal"])
             can.send(can_id, data, fd=fd, remote=remote, brs=brs, extended=extended)
+            if settle_ms:
+                # Diagnostic hold only: elapsed time does not confirm CAN delivery.
+                time.sleep(settle_ms / 1000)
         finally:
             can.stop()
     return {
-        "profile": profile.name,
-        "rule": rule.name,
-        "nominal_bitrate": profile.nominal_bitrate,
-        "data_bitrate": profile.data_bitrate,
         "frame": {"id": can_id, "data": data.hex(" ").upper(), "fd": fd, "remote": remote, "brs": brs, "extended": extended},
+        "completion": "usb_command_accepted",
+        "settle_ms": settle_ms,
     }
 
 
 def _capture(
-    serial: str, duration_ms: int, max_frames: int, *, profile_path: Path | None = None,
+    serial: str, duration_ms: int, max_frames: int, *,
     can_factory: Callable[[str], JCan] | None = None,
+    stop_event: Event | None = None,
 ) -> dict[str, Any]:
-    profile = _load_profile(profile_path)
-    profile.require_enabled(serial)
-    if not isinstance(duration_ms, int) or isinstance(duration_ms, bool) or not 1 <= duration_ms <= profile.max_capture_ms:
-        raise JCanError(f"duration_ms 范围必须是 1..{profile.max_capture_ms}")
-    if not isinstance(max_frames, int) or isinstance(max_frames, bool) or not 1 <= max_frames <= profile.max_capture_frames:
-        raise JCanError(f"max_frames 范围必须是 1..{profile.max_capture_frames}")
-    if not any(rule.direction == "rx" for rule in profile.frames):
-        raise JCanError("profile 未定义 RX frame 规则")
+    if not isinstance(duration_ms, int) or isinstance(duration_ms, bool) or not 1 <= duration_ms <= MAX_CAPTURE_MS:
+        raise JCanError(f"duration_ms 范围必须是 1..{MAX_CAPTURE_MS}")
+    if not isinstance(max_frames, int) or isinstance(max_frames, bool) or not 1 <= max_frames <= MAX_CAPTURE_FRAMES:
+        raise JCanError(f"max_frames 范围必须是 1..{MAX_CAPTURE_FRAMES}")
 
     factory = can_factory or (lambda selected: JCan(LibUsb(), selected))
     parser = CanStreamParser()
@@ -858,24 +862,22 @@ def _capture(
     started = time.monotonic()
     deadline = started + duration_ms / 1000
     with factory(serial) as can:
-        profile.verify_config(can)
         can.enable_receive()
-        can.start(MODES["silent"])
         try:
+            can.start(MODES["silent"])
             while received < max_frames and time.monotonic() < deadline:
+                if stop_event is not None and stop_event.is_set():
+                    break
                 remaining_ms = max(1, int((deadline - time.monotonic()) * 1000))
                 for frame in parser.feed(can.receive(min(100, remaining_ms))):
                     received += 1
-                    if profile.allows_rx(frame):
-                        matched += 1
-                        if len(samples) < 50:
-                            samples.append(_frame_summary(frame))
+                    matched += 1
+                    samples.append(_frame_summary(frame))
                     if received >= max_frames:
                         break
         finally:
             can.stop()
     return {
-        "profile": profile.name,
         "duration_ms": (time.monotonic() - started) * 1000,
         "received_frames": received,
         "matched_frames": matched,
@@ -1133,7 +1135,7 @@ async def jcan_loopback_benchmark(serial: str, ctx: Context, count: int = 100) -
 
 @mcp.tool()
 async def jcan_bus_profile_status() -> dict[str, Any]:
-    """Read and validate the local physical-bus profile without accessing USB."""
+    """Read the optional project policy profile without enforcing it in MCP."""
     try:
         return _result("bus_profile_status", None, data=_profile_status())
     except (JCanError, OSError, ValueError) as exc:
@@ -1142,19 +1144,36 @@ async def jcan_bus_profile_status() -> dict[str, Any]:
 
 @mcp.tool()
 async def jcan_capture(serial: str, ctx: Context, duration_ms: int = 1000, max_frames: int = 100) -> dict[str, Any]:
-    """Capture bounded listen-only traffic allowed by the active physical-bus profile."""
-    return await _hardware_call(ctx, "capture", serial, _capture, serial, duration_ms, max_frames)
+    """Capture listen-only traffic for 1..600000 ms, up to 1..100000 frames.
+
+    Stops at the first limit; defaults are 1000 ms and 100 frames. For long
+    captures, set max_frames explicitly and allow a client timeout longer than
+    duration_ms plus USB cleanup and result transfer. MCP cancellation requests
+    stop after the current USB read (at most 100 ms), then CANStop/USB close.
+    """
+    stop_event = Event()
+    try:
+        return await _hardware_call(
+            ctx, "capture", serial, _capture, serial, duration_ms, max_frames, stop_event=stop_event,
+        )
+    finally:
+        stop_event.set()
 
 
 @mcp.tool()
 async def jcan_send_once(
     serial: str, can_id: int, data_hex: str, ctx: Context, fd: bool = False, remote: bool = False,
-    brs: bool = False, extended: bool = False,
+    brs: bool = False, extended: bool = False, settle_ms: int = 0,
 ) -> dict[str, Any]:
-    """Send one frame only when serial, flags, DLC, and exact payload match the active profile."""
+    """Send one frame; success confirms the USB command, not physical delivery.
+
+    settle_ms (0..2000, default 0) holds CAN running after the send command
+    returns and before CANStop, for bounded stop-timing diagnosis. No retries
+    or response reception; verify delivery with an independent bus capture.
+    """
     return await _hardware_call(
         ctx, "send_once", serial, _send_once, serial, can_id, data_hex,
-        fd=fd, remote=remote, brs=brs, extended=extended,
+        fd=fd, remote=remote, brs=brs, extended=extended, settle_ms=settle_ms,
     )
 
 
@@ -1163,7 +1182,7 @@ async def jcan_periodic_start(
     serial: str, can_id: int, data_hex: str, period_ms: int, count: int, ctx: Context,
     fd: bool = False, remote: bool = False, brs: bool = False, extended: bool = False,
 ) -> dict[str, Any]:
-    """Start a bounded profile-approved periodic task; count must be 1..1500."""
+    """Start a bounded protocol-valid periodic task; count must be 1..1500."""
     try:
         data = await ctx.request_context.lifespan_context.periodic.start(
             serial, can_id, data_hex, period_ms, count,
@@ -1198,7 +1217,7 @@ async def jcan_periodic_stop(serial: str, task_id: str, ctx: Context) -> dict[st
 async def jcan_sdo_read(
     serial: str, node: int, index: int, subindex: int, ctx: Context,
 ) -> dict[str, Any]:
-    """Read one expedited CANopen SDO object allowed by the active physical-bus profile."""
+    """Read one protocol-valid expedited CANopen SDO object."""
     return await _hardware_call(ctx, "sdo_read", serial, _sdo_read, serial, node, index, subindex)
 
 
@@ -1206,7 +1225,7 @@ async def jcan_sdo_read(
 async def jcan_sdo_u16_same_value_test(
     serial: str, node: int, index: int, subindex: int, ctx: Context,
 ) -> dict[str, Any]:
-    """Read a profile-approved U16 object, download the same value, and verify it by upload."""
+    """Read a U16 object, download the same value, and verify it by upload."""
     return await _hardware_call(
         ctx, "sdo_u16_same_value_test", serial, _sdo_u16_same_value_test, serial, node, index, subindex,
     )

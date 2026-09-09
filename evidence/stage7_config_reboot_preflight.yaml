@@ -1,0 +1,14 @@
+safety_preflight:
+  schema_version: 1
+  timestamp_utc: "2026-09-04T07:30:01Z"
+  operation: "adapter-config-write-and-reset"
+  authorization: "User request on 2026-09-04: perform HIL and complete the remaining five hardware tests"
+  target:
+    board: "JooDevice JTool-CAN"
+    hardware_revision: "unknown"
+    probe_or_adapter_serial: "207F346D5650"
+    transport: "usb"
+  artifact_or_stimulus: "test_jcan_mcp.py McpStage3HilTest: same-value named config apply, reversible config roundtrip, normal reboot"
+  limits: "No IntoBoot; named reversible fields only; reboot timeout 15 s; one test attempt"
+  recovery_plan: "Automatic rollback in jcan_apply_config/config_roundtrip; verify re-enumeration and compare all 10 configuration fields with the recorded baseline"
+  approved: true

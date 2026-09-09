@@ -1,0 +1,14 @@
+safety_preflight:
+  schema_version: 1
+  timestamp_utc: "2026-09-04T07:30:01Z"
+  operation: "bus-write"
+  authorization: "User request on 2026-09-04 plus active project policy approval"
+  target:
+    board: "JCAN physical bus"
+    hardware_revision: "unknown"
+    probe_or_adapter_serial: "207F346D5650"
+    transport: "can"
+  artifact_or_stimulus: "One standard Classic CAN frame: ID 0x7FF, DLC 8, data 01 02 03 04 05 06 07 08"
+  limits: "500 kbit/s nominal; exactly one frame; no CAN FD, BRS, RTR, or extended ID; one test attempt"
+  recovery_plan: "jcan_send_once always calls CANStop and closes USB; stop immediately on any warning or error"
+  approved: true

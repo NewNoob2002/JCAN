@@ -14,6 +14,19 @@ EP_COMMAND_IN = 0x82
 EP_STREAM_IN = 0x83
 HEADER = struct.Struct("<BBBBH")
 DLC_LENGTHS = (0, 1, 2, 3, 4, 5, 6, 7, 8, 12, 16, 20, 24, 32, 48, 64)
+
+
+def validate_frame(can_id, data, *, fd=False, remote=False, brs=False, extended=False):
+    if can_id < 0 or can_id > (0x1FFFFFFF if extended else 0x7FF):
+        raise JCanError("CAN ID 超出标准帧/扩展帧范围")
+    if remote and (fd or data):
+        raise JCanError("远程帧只支持经典 CAN 且不能携带数据")
+    if brs and not fd:
+        raise JCanError("BRS 只支持 CAN FD")
+    if len(data) not in (DLC_LENGTHS if fd else range(9)):
+        raise JCanError("经典 CAN 长度需为 0..8；CAN FD 长度需为 0..8/12/16/20/24/32/48/64")
+
+
 MODES = {"normal": 0, "silent": 1, "loopback": 2, "silent-loopback": 3}
 CONFIG_VALUE_OFFSET = 16
 CONFIG_FIELDS = (
@@ -212,7 +225,7 @@ class CanStreamParser:
             del self.buffer[:total]
             if crc8(raw[:-1]) != raw[-1]:
                 continue
-            frames.append({
+            frame = {
                 "fd": bool(flags & 0x10),
                 "remote": bool(flags & 0x20),
                 "brs": bool(flags & 0x40),
@@ -220,7 +233,15 @@ class CanStreamParser:
                 "id": struct.unpack_from("<I", raw, 3)[0],
                 "timestamp": struct.unpack_from("<H", raw, 7)[0],
                 "data": raw[9:-1],
-            })
+            }
+            try:
+                validate_frame(
+                    frame["id"], frame["data"], fd=frame["fd"], remote=frame["remote"],
+                    brs=frame["brs"], extended=frame["extended"],
+                )
+            except JCanError:
+                continue
+            frames.append(frame)
         return frames
 
 
@@ -254,15 +275,7 @@ class JCan:
         self.request(5, 2)
 
     def send(self, can_id, data, *, fd=False, remote=False, brs=False, extended=False):
-        if can_id < 0 or can_id > (0x1FFFFFFF if extended else 0x7FF):
-            raise JCanError("CAN ID 超出标准帧/扩展帧范围")
-        if remote and (fd or data):
-            raise JCanError("远程帧只支持经典 CAN 且不能携带数据")
-        if brs and not fd:
-            raise JCanError("BRS 只支持 CAN FD")
-        allowed = DLC_LENGTHS if fd else range(9)
-        if len(data) not in allowed:
-            raise JCanError("经典 CAN 长度需为 0..8；CAN FD 长度需为 0..8/12/16/20/24/32/48/64")
+        validate_frame(can_id, data, fd=fd, remote=remote, brs=brs, extended=extended)
         payload = struct.pack("<BBBBIB", fd, remote, brs, extended, can_id, len(data)) + data.ljust(64, b"\0")
         self.request(5, 0, payload)
 
@@ -403,11 +416,11 @@ def print_frame(frame):
     print(f"{frame['timestamp']:05d}  {frame['id']:0{width}X}  [{len(frame['data'])}] {data}  {'|'.join(flags)}".rstrip())
 
 
-def wait_frame(can, parser, can_id, timeout=2.0):
+def wait_frame(can, parser, can_id, timeout=2.0, *, match=None):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         for frame in parser.feed(can.receive(min(500, max(1, int((deadline - time.monotonic()) * 1000))))):
-            if frame["id"] == can_id:
+            if frame["id"] == can_id and (match is None or match(frame)):
                 return frame
     raise JCanError(f"等待 CAN ID {can_id:03X} 超时")
 
@@ -489,11 +502,12 @@ def parse_sdo_download(data, index, subindex):
 
 def sdo_read(can, parser, node, index, subindex):
     can.send(0x600 + node, struct.pack("<BHB4x", 0x40, index, subindex))
-    deadline = time.monotonic() + 2.0
-    while True:
-        frame = wait_frame(can, parser, 0x580 + node, max(0, deadline - time.monotonic()))
-        if not any(frame[flag] for flag in ("extended", "fd", "remote", "brs")) and len(frame["data"]) == 8 and frame["data"][1:4] == struct.pack("<HB", index, subindex):
-            return parse_sdo_upload(frame["data"], index, subindex), frame["data"]
+    frame = wait_frame(
+        can, parser, 0x580 + node,
+        match=lambda frame: not any(frame[flag] for flag in ("extended", "fd", "remote", "brs"))
+        and len(frame["data"]) == 8 and frame["data"][1:4] == struct.pack("<HB", index, subindex),
+    )
+    return parse_sdo_upload(frame["data"], index, subindex), frame["data"]
 
 
 def sdo_write(can, parser, node, index, subindex, value):
@@ -501,12 +515,13 @@ def sdo_write(can, parser, node, index, subindex, value):
     if len(value) not in commands:
         raise JCanError("仅支持 1..4 字节 expedited SDO download")
     can.send(0x600 + node, struct.pack("<BHB", commands[len(value)], index, subindex) + value.ljust(4, b"\0"))
-    deadline = time.monotonic() + 2.0
-    while True:
-        frame = wait_frame(can, parser, 0x580 + node, max(0, deadline - time.monotonic()))
-        if not any(frame[flag] for flag in ("extended", "fd", "remote", "brs")) and len(frame["data"]) == 8 and frame["data"][1:4] == struct.pack("<HB", index, subindex):
-            parse_sdo_download(frame["data"], index, subindex)
-            return frame["data"]
+    frame = wait_frame(
+        can, parser, 0x580 + node,
+        match=lambda frame: not any(frame[flag] for flag in ("extended", "fd", "remote", "brs"))
+        and len(frame["data"]) == 8 and frame["data"][1:4] == struct.pack("<HB", index, subindex),
+    )
+    parse_sdo_download(frame["data"], index, subindex)
+    return frame["data"]
 
 
 def self_test(verbose=True):
@@ -518,6 +533,9 @@ def self_test(verbose=True):
     assert parser.feed(raw[:4]) == []
     frame = parser.feed(raw[4:])[0]
     assert frame["extended"] and frame["id"] == 0x18FF0011 and frame["data"] == b"\x11\x22\x33"
+    raw = b"\xff\xaa\x40" + struct.pack("<IH", 0x123, 43)
+    raw += bytes([crc8(raw)])
+    assert parser.feed(raw) == []
     assert parse_sdo_upload(bytes.fromhex("43 18 10 01 78 56 34 12"), 0x1018, 1) == bytes.fromhex("78 56 34 12")
     assert parse_sdo_download(bytes.fromhex("60 08 20 00 00 00 00 00"), 0x2008, 0) is None
     try:

@@ -1,0 +1,42 @@
+{
+  "test_result": {
+    "schema_version": 1,
+    "source_revision": "1b0f39967b298de7c9858f1389a63bb4dd29d968",
+    "working_tree": "uncommitted; existing edits preserved",
+    "artifact_checksums": {
+      "jcan.py": "cba32bed115e48e76b26634f584720d123ebecc527c02768a56699b083fe12b7",
+      "jcan_mcp.py": "99051ac3a96e6a83e0356eb0e2513042a34c8d9d514a1af424eece709ded71fa",
+      "test_jcan_mcp.py": "91d22b352f0708b1ac7ad3719eabbd77b72e692181497a2eacd50ac7e5187674",
+      "JCAN_API.md": "15f37ea24a343d8aa77ad6fe9fbc91c0ac0bdcf48ab911b3f195cc9a319a9356"
+    },
+    "created_at_utc": "2026-09-07T06:03:46.246023+00:00",
+    "level": "host-unit-and-stdio-integration",
+    "command": ".venv/bin/python -m unittest test_jcan_mcp.McpHostTest test_jcan_mcp.McpStdioTest -v",
+    "passed": true,
+    "counts": {
+      "total": 19,
+      "passed": 19,
+      "failed": 0,
+      "skipped": 0
+    },
+    "timing": {
+      "duration_ms": 1308
+    },
+    "log": "evidence/20260907_fixes_final_tests.log",
+    "requirements": [
+      "complete SDO matching within one USB batch",
+      "hardware gate covers periodic cleanup",
+      "periodic startup failure attempts stop and close",
+      "cleanup errors retained in session result"
+    ]
+  },
+  "deployment": {
+    "running_mcp_restarted": false,
+    "new_physical_transmissions": 0,
+    "post_fix_hil_performed": false
+  },
+  "remaining_limitations": [
+    "Raw send_once does not receive a response or prove physical TX completion; settle_ms default remains zero",
+    "No generic arbitrary-value SDO write tool or persistent RX subscription is exposed by MCP"
+  ]
+}

@@ -1,0 +1,14 @@
+safety_preflight:
+  schema_version: 1
+  timestamp_utc: "2026-09-04T07:30:01Z"
+  operation: "bus-write"
+  authorization: "User request on 2026-09-04 to complete the remaining periodic HIL test"
+  target:
+    board: "CANopen Node 1 on JCAN physical bus"
+    hardware_revision: "unknown"
+    probe_or_adapter_serial: "207F346D5650"
+    transport: "can"
+  artifact_or_stimulus: "Standard Classic CAN ID 0x601, DLC 8, expedited U16 same-value SDO download 2B 08 20 00 C8 00 00 00"
+  limits: "500 kbit/s nominal; 50 ms period; first run 1200 frames, second run 1500 frames; no EEPROM save; one suite attempt"
+  recovery_plan: "MCP owns one bounded periodic session, stops CAN and closes USB on completion/failure; read 0x2008:00 before and after each run and require value 200"
+  approved: true

@@ -1,23 +1,9 @@
-# JCAN MCP tool contract
+# JCAN CLI contract
 
-All hardware operations require an explicit adapter `serial`. Results are structured records with `ok`, `operation`, `data`, `warnings`, and `evidence_path`. An MCP protocol success with `ok=false` is an operation failure.
+The supported control surface is target/release/jcan. Do not use the legacy MCP tools.
 
-| Intent | Tool | Required boundary |
-|---|---|---|
-| Verify host protocol code | `jcan_self_test` | No hardware |
-| Find adapters | `jcan_scan` | Read-only; select one serial before continuing |
-| Read baseline | `jcan_get_config` | Exact serial |
-| Inspect physical authorization | `jcan_bus_profile_status` | No USB access; do not treat approval as user permission |
-| Internal functional check | `jcan_loopback_test` | Three bounded internal frames |
-| Internal performance check | `jcan_loopback_benchmark` | Explicit bounded count |
-| Passive physical capture | `jcan_capture` | Profile match plus bounded `duration_ms` and `max_frames` |
-| Send one physical frame | `jcan_send_once` | Exact profile-approved serial, ID, flags, DLC, and payload |
-| Read CANopen object | `jcan_sdo_read` | Profile-approved node/index/subindex |
-| Same-value U16 node test | `jcan_sdo_u16_same_value_test` | Explicit write authorization; writes only the value just read and does not save EEPROM |
-| Start periodic traffic | `jcan_periodic_start` | Exact profile rule with `periodic=true`, bounded period and count |
-| Inspect/stop periodic traffic | `jcan_periodic_list`, `jcan_periodic_stop` | Exact serial and returned task ID |
-| Reversible configuration test | `jcan_config_roundtrip_test` | Preflight; verify restoration |
-| Apply configuration | `jcan_apply_config` | Named fields only, baseline/readback/rollback required |
-| Reboot adapter | `jcan_reboot` | Separate authorization and re-enumeration timeout |
+One-shot Agent calls use --json and emit objects containing ok, operation, data, and warnings. Capture emits frame objects followed by a summary object. Errors exit non-zero and emit ok=false to stderr.
 
-Periodic traffic owns the adapter session; other hardware operations should remain blocked until it completes or is stopped. Report actual counts, timing/jitter, cleanup state, warnings, and evidence paths instead of inferring success from request completion.
+Persistent Agent calls use target/release/jcan --json --serial SERIAL session --mode MODE. Write one JSON object per stdin line. Supported operations are ping, status, config_get, config_set, receive, send, start, stop, set_mode, disconnect, connect, and shutdown. Responses echo id; asynchronous messages contain event. Frame events are disabled by default. Human terminals omit --json to use the TUI.
+
+Run target/release/jcan help for complete syntax. Hardware commands require an explicit serial; capture and periodic commands enforce finite limits.

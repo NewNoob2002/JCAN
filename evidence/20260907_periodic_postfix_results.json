@@ -1,0 +1,55 @@
+{
+  "passed": true,
+  "scope": "Bounded normal periodic run and cleanup smoke; not cleanup-race or startup-failure injection",
+  "task": {
+    "task_id": "periodic-1",
+    "serial": "207F346D5650",
+    "frame": {
+      "id": 291,
+      "data": "11 22 33 44",
+      "fd": false,
+      "remote": false,
+      "brs": false,
+      "extended": false
+    },
+    "period_ms": 100,
+    "target_count": 10,
+    "sent_count": 10,
+    "missed_periods": 0,
+    "state": "completed",
+    "started_at_utc": "2026-09-07T06:19:56.437132+00:00",
+    "completed_at_utc": "2026-09-07T06:19:57.461365+00:00",
+    "error": null,
+    "evidence_path": "/home/gtc/Desktop/workspace/JCAN/evidence/runtime/20260907T061957.461479Z-1788761997461507945-periodic_run.json",
+    "timing": {
+      "samples": 10,
+      "jitter_ms": {
+        "min": 0.4436730123416055,
+        "avg": 0.8508806069585262,
+        "max": 1.4353060105349869
+      },
+      "last": {
+        "planned_ms": 999.9999999854481,
+        "actual_ms": 1000.628128000244,
+        "jitter_ms": 0.6281280147959478
+      }
+    }
+  },
+  "configuration_unchanged": true,
+  "session_cleanup_error": null,
+  "physical_delivery_independently_verified": false,
+  "evidence": {
+    "baseline": "evidence/runtime/20260907T061920.359364Z-1788761960359392115-get_config.json",
+    "start": "evidence/runtime/20260907T061956.459876Z-1788761996459902791-periodic_start.json",
+    "run": "evidence/runtime/20260907T061957.461479Z-1788761997461507945-periodic_run.json",
+    "list": "evidence/runtime/20260907T062015.814688Z-1788762015814715240-periodic_list.json",
+    "after": "evidence/runtime/20260907T062052.594953Z-1788762052594972032-get_config.json"
+  },
+  "process_parents": {
+    "132591": 130611,
+    "153934": 135322,
+    "209519": 135322
+  },
+  "process_fds": "evidence/20260907_mcp_process_pipes.json",
+  "process_finding": "All three stdio pipe sets remain held by live Codex parents; new session did not release prior connections. Cannot distinguish retained sessions from client lifecycle leak without client internals."
+}

@@ -1,0 +1,35 @@
+test_apply_config_success_and_failures (test_jcan_mcp.McpHostTest.test_apply_config_success_and_failures) ... ok
+test_capture_client_timeout_stops_worker (test_jcan_mcp.McpHostTest.test_capture_client_timeout_stops_worker) ... ok
+test_capture_invalid_bounds_and_error_cleanup (test_jcan_mcp.McpHostTest.test_capture_invalid_bounds_and_error_cleanup) ... ok
+test_long_capture_deadline_and_frame_limit (test_jcan_mcp.McpHostTest.test_long_capture_deadline_and_frame_limit) ... ok
+test_periodic_scheduler_completion_and_stop (test_jcan_mcp.McpHostTest.test_periodic_scheduler_completion_and_stop) ... ok
+test_periodic_task_limit_and_close_cleanup (test_jcan_mcp.McpHostTest.test_periodic_task_limit_and_close_cleanup) ... ok
+test_periodic_validates_frame_before_usb (test_jcan_mcp.McpHostTest.test_periodic_validates_frame_before_usb) ... ok
+test_protocol_validation_rejects_before_usb (test_jcan_mcp.McpHostTest.test_protocol_validation_rejects_before_usb) ... ok
+test_roundtrip_and_reboot (test_jcan_mcp.McpHostTest.test_roundtrip_and_reboot) ... ok
+test_sdo_read_and_same_value_write (test_jcan_mcp.McpHostTest.test_sdo_read_and_same_value_write) ... ok
+test_send_once_bounded_hold_and_cleanup (test_jcan_mcp.McpHostTest.test_send_once_bounded_hold_and_cleanup) ... ok
+test_structured_adapter_errors (test_jcan_mcp.McpHostTest.test_structured_adapter_errors) ... ok
+test_unrestricted_send_and_capture (test_jcan_mcp.McpHostTest.test_unrestricted_send_and_capture) ... ok
+test_disconnect_stops_active_periodic_session (test_jcan_mcp.McpStdioTest.test_disconnect_stops_active_periodic_session) ... execute program '/home/gtc/Desktop/workspace/JCAN/.venv/bin/python': <_UnixSubprocessTransport pid=162471 running stdin=<_UnixWritePipeTransport fd=7 idle bufsize=0> stdout=<_UnixReadPipeTransport fd=8 polling>>
+Processing request of type CallToolRequest
+Processing request of type ListToolsRequest
+<_UnixReadPipeTransport fd=8 polling> was closed by peer
+<_UnixSubprocessTransport pid=162471 running stdin=<_UnixWritePipeTransport closed fd=7 closed> stdout=<_UnixReadPipeTransport closed fd=8 closed>> exited with return code 0
+ok
+test_tools_and_self_test (test_jcan_mcp.McpStdioTest.test_tools_and_self_test) ... execute program '/home/gtc/Desktop/workspace/JCAN/.venv/bin/python': <_UnixSubprocessTransport pid=162493 running stdin=<_UnixWritePipeTransport fd=7 idle bufsize=0> stdout=<_UnixReadPipeTransport fd=8 polling>>
+Processing request of type ListToolsRequest
+Processing request of type CallToolRequest
+Processing request of type CallToolRequest
+Processing request of type CallToolRequest
+Processing request of type CallToolRequest
+Processing request of type CallToolRequest
+Processing request of type CallToolRequest
+<_UnixReadPipeTransport fd=8 polling> was closed by peer
+<_UnixSubprocessTransport pid=162493 running stdin=<_UnixWritePipeTransport closed fd=7 closed> stdout=<_UnixReadPipeTransport closed fd=8 closed>> exited with return code 0
+ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 1.341s
+
+OK

@@ -1,0 +1,474 @@
+{
+  "created_at_utc": "2026-09-07T05:04:09.401120+00:00",
+  "source_revision": "1b0f39967b298de7c9858f1389a63bb4dd29d968",
+  "artifact_checksums": {
+    "AGENTS.md": "5db9f8e9181b73c86b8f47c98ee16ad10714940905b523c7632fc60e996fd0f3",
+    ".agents/skills/jcan/SKILL.md": "254e06064732b7c684f081d83d6007aca4537539ea0321c5ec3057b37ed75be0",
+    ".agents/skills/jcan/references/safety.md": "7471203fec1dc1bdf2b245e1d4159e2c8577dce759744ab77d8ba3de3c267ddd",
+    ".agents/skills/jcan/references/tool-contract.md": "0c1012e29e20b1c903946aea9df977d70a2adb4cdba59eb759a3c55691659428",
+    "jcan.py": "aeb7d834d8a02644e102ee6133d3d29e46b53e74ab26cf057ee61328715f29d1",
+    "jcan_mcp.py": "64f42eb513cb8ceaf26611a1bb4053d21584dc53ed11eda18513609b2a5995b5",
+    "test_jcan_mcp.py": "502c7d7af889d804e45f404921b2b2fb60d3d7f83fcb238d4ec170e39ff7be95"
+  },
+  "test_result": {
+    "schema_version": 1,
+    "level": "host-unit-and-stdio-integration",
+    "command": ".venv/bin/python -m unittest test_jcan_mcp.McpHostTest test_jcan_mcp.McpStdioTest -v",
+    "attempts": 2,
+    "attempt_1": {
+      "environment": "sandbox",
+      "total": 15,
+      "passed": 12,
+      "errors": 3,
+      "duration_s": 16.616,
+      "failure": "capture cancellation worker and two stdio initialization timeouts"
+    },
+    "attempt_2": {
+      "environment": "approved outside sandbox",
+      "total": 15,
+      "passed": 15,
+      "errors": 0,
+      "duration_s": 1.341
+    },
+    "passed": true,
+    "log": "evidence/20260907_full_host_tests.log"
+  },
+  "hardware": {
+    "serial": "207F346D5650",
+    "physical_send_invocations": 2,
+    "physical_delivery_verified": true,
+    "external_receive_verified": true,
+    "additional_scope": "awaiting bounded configuration/reboot/periodic/SDO scope answer",
+    "independent_observer": "User-provided RK3588 candump includes exact 0x601 and matching 0x581 response",
+    "physical_delivery_acceptance": "passed_for_separately_authorized_settle_ms_1000_attempt",
+    "observer_line_timestamp_utc": "2026-09-07T04:36:32.114973Z",
+    "next_diagnostic": "Address three host-reproduced lifecycle/SDO defects; default zero-hold and final periodic frame physical completion still unresolved.",
+    "raw_capture": "evidence/20260907_rk3588_hold_1000_candump.txt",
+    "measurements": {
+      "response_delay_us": 356,
+      "heartbeat_interval_avg_ms": 499.0613076923077,
+      "heartbeat_interval_min_ms": 499.021,
+      "heartbeat_interval_max_ms": 499.084,
+      "device_unit_ms": 0.5,
+      "device_unit_source": "explicit user confirmation",
+      "expected_heartbeat_ms": 500,
+      "mean_deviation_percent": -0.18773846153846
+    },
+    "followup_sdo_read": {
+      "node": 1,
+      "index": 4119,
+      "subindex": 0,
+      "value_unsigned": 1000,
+      "value_hex": "E8 03",
+      "count": 1
+    },
+    "followup_config_unchanged": true
+  },
+  "runtime_evidence": [
+    {
+      "path": "evidence/runtime/20260907T045545.044670Z-1788756945044705826-scan.json",
+      "result": {
+        "ok": true,
+        "serial": null,
+        "operation": "scan",
+        "data": [
+          {
+            "serial": "207F346D5650",
+            "bus": 1,
+            "address": 10,
+            "vid": "ffff",
+            "pid": "0004"
+          }
+        ],
+        "warnings": [],
+        "evidence_path": "/home/gtc/Desktop/workspace/JCAN/evidence/runtime/20260907T045545.044670Z-1788756945044705826-scan.json"
+      }
+    },
+    {
+      "path": "evidence/runtime/20260907T045647.630154Z-1788757007630184133-get_config.json",
+      "result": {
+        "ok": true,
+        "serial": "207F346D5650",
+        "operation": "get_config",
+        "data": {
+          "can_speed": "0c",
+          "can_customval": "00 00 01 00 04 00 59 00 1e 00",
+          "fd_speed": "06",
+          "fd_customval": "00 00 03 00 04 00 1d 00 0a 00",
+          "standard": "00",
+          "term_res": "00",
+          "busoff_recovery": "00",
+          "auto_retrans": "00",
+          "hardware_version": "00 00 00 00 00 00 00 00 00 00",
+          "id": "00 00"
+        },
+        "warnings": [],
+        "evidence_path": "/home/gtc/Desktop/workspace/JCAN/evidence/runtime/20260907T045647.630154Z-1788757007630184133-get_config.json"
+      }
+    },
+    {
+      "path": "evidence/runtime/20260907T045857.044108Z-1788757137044124608-self_test.json",
+      "result": {
+        "ok": true,
+        "serial": null,
+        "operation": "self_test",
+        "data": {
+          "passed": true
+        },
+        "warnings": [],
+        "evidence_path": "/home/gtc/Desktop/workspace/JCAN/evidence/runtime/20260907T045857.044108Z-1788757137044124608-self_test.json"
+      }
+    },
+    {
+      "path": "evidence/runtime/20260907T050004.969540Z-1788757204969564901-loopback_test.json",
+      "result": {
+        "ok": true,
+        "serial": "207F346D5650",
+        "operation": "loopback_test",
+        "data": [
+          {
+            "id": 291,
+            "data": "11 22 33 44",
+            "fd": false,
+            "remote": false,
+            "brs": false,
+            "extended": false,
+            "timestamp": 0
+          },
+          {
+            "id": 419364881,
+            "data": "00 01 02 03 04 05 06 07",
+            "fd": false,
+            "remote": false,
+            "brs": false,
+            "extended": true,
+            "timestamp": 0
+          },
+          {
+            "id": 801,
+            "data": "00 01 02 03 04 05 06 07 08 09 0A 0B",
+            "fd": true,
+            "remote": false,
+            "brs": true,
+            "extended": false,
+            "timestamp": 0
+          }
+        ],
+        "warnings": [],
+        "evidence_path": "/home/gtc/Desktop/workspace/JCAN/evidence/runtime/20260907T050004.969540Z-1788757204969564901-loopback_test.json"
+      }
+    },
+    {
+      "path": "evidence/runtime/20260907T050029.746801Z-1788757229746854567-loopback_benchmark.json",
+      "result": {
+        "ok": true,
+        "serial": "207F346D5650",
+        "operation": "loopback_benchmark",
+        "data": {
+          "count": 100,
+          "elapsed_s": 0.045973334,
+          "fps": 2175.173982378568,
+          "latency_ms": {
+            "min": 0.425255,
+            "avg": 0.45807902,
+            "p95": 0.501048,
+            "max": 0.540873
+          }
+        },
+        "warnings": [],
+        "evidence_path": "/home/gtc/Desktop/workspace/JCAN/evidence/runtime/20260907T050029.746801Z-1788757229746854567-loopback_benchmark.json"
+      }
+    },
+    {
+      "path": "evidence/runtime/20260907T050050.848907Z-1788757250848932066-capture.json",
+      "result": {
+        "ok": true,
+        "serial": "207F346D5650",
+        "operation": "capture",
+        "data": {
+          "duration_ms": 3000.495428999784,
+          "received_frames": 0,
+          "matched_frames": 0,
+          "dropped_frames": 0,
+          "samples": []
+        },
+        "warnings": [],
+        "evidence_path": "/home/gtc/Desktop/workspace/JCAN/evidence/runtime/20260907T050050.848907Z-1788757250848932066-capture.json"
+      }
+    },
+    {
+      "path": "evidence/runtime/20260907T050112.361508Z-1788757272361541561-send_once.json",
+      "result": {
+        "ok": true,
+        "serial": "207F346D5650",
+        "operation": "send_once",
+        "data": {
+          "frame": {
+            "id": 1537,
+            "data": "2B 17 10 00 E8 03 00 00",
+            "fd": false,
+            "remote": false,
+            "brs": false,
+            "extended": false
+          },
+          "completion": "usb_command_accepted",
+          "settle_ms": 0
+        },
+        "warnings": [],
+        "evidence_path": "/home/gtc/Desktop/workspace/JCAN/evidence/runtime/20260907T050112.361508Z-1788757272361541561-send_once.json"
+      }
+    },
+    {
+      "path": "evidence/runtime/20260907T050134.291458Z-1788757294291488140-periodic_list.json",
+      "result": {
+        "ok": true,
+        "serial": "207F346D5650",
+        "operation": "periodic_list",
+        "data": {
+          "active": [],
+          "recent": [],
+          "session_cleanup_error": null
+        },
+        "warnings": [],
+        "evidence_path": "/home/gtc/Desktop/workspace/JCAN/evidence/runtime/20260907T050134.291458Z-1788757294291488140-periodic_list.json"
+      }
+    },
+    {
+      "path": "evidence/runtime/20260907T050156.180429Z-1788757316180454490-get_config.json",
+      "result": {
+        "ok": true,
+        "serial": "207F346D5650",
+        "operation": "get_config",
+        "data": {
+          "can_speed": "0c",
+          "can_customval": "00 00 01 00 04 00 59 00 1e 00",
+          "fd_speed": "06",
+          "fd_customval": "00 00 03 00 04 00 1d 00 0a 00",
+          "standard": "00",
+          "term_res": "00",
+          "busoff_recovery": "00",
+          "auto_retrans": "00",
+          "hardware_version": "00 00 00 00 00 00 00 00 00 00",
+          "id": "00 00"
+        },
+        "warnings": [],
+        "evidence_path": "/home/gtc/Desktop/workspace/JCAN/evidence/runtime/20260907T050156.180429Z-1788757316180454490-get_config.json"
+      }
+    },
+    {
+      "path": "evidence/runtime/20260907T054144.908083Z-1788759704908118989-scan.json",
+      "result": {
+        "ok": true,
+        "serial": null,
+        "operation": "scan",
+        "data": [
+          {
+            "serial": "207F346D5650",
+            "bus": 1,
+            "address": 10,
+            "vid": "ffff",
+            "pid": "0004"
+          }
+        ],
+        "warnings": [],
+        "evidence_path": "/home/gtc/Desktop/workspace/JCAN/evidence/runtime/20260907T054144.908083Z-1788759704908118989-scan.json"
+      }
+    },
+    {
+      "path": "evidence/runtime/20260907T054206.987874Z-1788759726987899814-get_config.json",
+      "result": {
+        "ok": true,
+        "serial": "207F346D5650",
+        "operation": "get_config",
+        "data": {
+          "can_speed": "0c",
+          "can_customval": "00 00 01 00 04 00 59 00 1e 00",
+          "fd_speed": "06",
+          "fd_customval": "00 00 03 00 04 00 1d 00 0a 00",
+          "standard": "00",
+          "term_res": "00",
+          "busoff_recovery": "00",
+          "auto_retrans": "00",
+          "hardware_version": "00 00 00 00 00 00 00 00 00 00",
+          "id": "00 00"
+        },
+        "warnings": [],
+        "evidence_path": "/home/gtc/Desktop/workspace/JCAN/evidence/runtime/20260907T054206.987874Z-1788759726987899814-get_config.json"
+      }
+    },
+    {
+      "path": "evidence/runtime/20260907T054312.211577Z-1788759792211615562-capture.json",
+      "result": {
+        "ok": true,
+        "serial": "207F346D5650",
+        "operation": "capture",
+        "data": {
+          "duration_ms": 3000.6538270008605,
+          "received_frames": 9,
+          "matched_frames": 9,
+          "dropped_frames": 0,
+          "samples": [
+            {
+              "id": 1409,
+              "data": "60 17 10 00 00 00 00 00",
+              "fd": false,
+              "remote": false,
+              "brs": false,
+              "extended": false,
+              "timestamp": 0
+            },
+            {
+              "id": 1793,
+              "data": "7F",
+              "fd": false,
+              "remote": false,
+              "brs": false,
+              "extended": false,
+              "timestamp": 0
+            },
+            {
+              "id": 1793,
+              "data": "7F",
+              "fd": false,
+              "remote": false,
+              "brs": false,
+              "extended": false,
+              "timestamp": 0
+            },
+            {
+              "id": 1793,
+              "data": "7F",
+              "fd": false,
+              "remote": false,
+              "brs": false,
+              "extended": false,
+              "timestamp": 0
+            },
+            {
+              "id": 1793,
+              "data": "7F",
+              "fd": false,
+              "remote": false,
+              "brs": false,
+              "extended": false,
+              "timestamp": 0
+            },
+            {
+              "id": 1793,
+              "data": "7F",
+              "fd": false,
+              "remote": false,
+              "brs": false,
+              "extended": false,
+              "timestamp": 0
+            },
+            {
+              "id": 1793,
+              "data": "7F",
+              "fd": false,
+              "remote": false,
+              "brs": false,
+              "extended": false,
+              "timestamp": 0
+            },
+            {
+              "id": 1793,
+              "data": "7F",
+              "fd": false,
+              "remote": false,
+              "brs": false,
+              "extended": false,
+              "timestamp": 0
+            },
+            {
+              "id": 1793,
+              "data": "7F",
+              "fd": false,
+              "remote": false,
+              "brs": false,
+              "extended": false,
+              "timestamp": 0
+            }
+          ]
+        },
+        "warnings": [],
+        "evidence_path": "/home/gtc/Desktop/workspace/JCAN/evidence/runtime/20260907T054312.211577Z-1788759792211615562-capture.json"
+      }
+    },
+    {
+      "path": "evidence/runtime/20260907T054353.762815Z-1788759833762839715-sdo_read.json",
+      "result": {
+        "ok": true,
+        "serial": "207F346D5650",
+        "operation": "sdo_read",
+        "data": {
+          "node": 1,
+          "index": 4119,
+          "subindex": 0,
+          "value_hex": "E8 03",
+          "value_unsigned": 1000,
+          "request": "40 17 10 00 00 00 00 00",
+          "response": "4B 17 10 00 E8 03 00 00",
+          "drained_receive_bytes": 0
+        },
+        "warnings": [],
+        "evidence_path": "/home/gtc/Desktop/workspace/JCAN/evidence/runtime/20260907T054353.762815Z-1788759833762839715-sdo_read.json"
+      }
+    },
+    {
+      "path": "evidence/runtime/20260907T054741.098139Z-1788760061098169044-periodic_list.json",
+      "result": {
+        "ok": true,
+        "serial": "207F346D5650",
+        "operation": "periodic_list",
+        "data": {
+          "active": [],
+          "recent": [],
+          "session_cleanup_error": null
+        },
+        "warnings": [],
+        "evidence_path": "/home/gtc/Desktop/workspace/JCAN/evidence/runtime/20260907T054741.098139Z-1788760061098169044-periodic_list.json"
+      }
+    },
+    {
+      "path": "evidence/runtime/20260907T054811.247579Z-1788760091247603323-get_config.json",
+      "result": {
+        "ok": true,
+        "serial": "207F346D5650",
+        "operation": "get_config",
+        "data": {
+          "can_speed": "0c",
+          "can_customval": "00 00 01 00 04 00 59 00 1e 00",
+          "fd_speed": "06",
+          "fd_customval": "00 00 03 00 04 00 1d 00 0a 00",
+          "standard": "00",
+          "term_res": "00",
+          "busoff_recovery": "00",
+          "auto_retrans": "00",
+          "hardware_version": "00 00 00 00 00 00 00 00 00 00",
+          "id": "00 00"
+        },
+        "warnings": [],
+        "evidence_path": "/home/gtc/Desktop/workspace/JCAN/evidence/runtime/20260907T054811.247579Z-1788760091247603323-get_config.json"
+      }
+    }
+  ],
+  "followup_host_reproduction": {
+    "scope": "host-only simulated devices",
+    "batched_sdo_response_loss": {
+      "upload": "等待 CAN ID 581 超时",
+      "download": "等待 CAN ID 581 超时"
+    },
+    "hardware_gate_released_before_cleanup": {
+      "gate_locked": false,
+      "active": false,
+      "stopped": false,
+      "closed": false
+    },
+    "startup_failure_missing_CANStop": {
+      "started": true,
+      "closed": true,
+      "CANStop_called": false
+    }
+  }
+}

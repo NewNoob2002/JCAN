@@ -1,0 +1,14 @@
+{
+  "safety_preflight": {
+    "schema_version": 1,
+    "operation": "bounded-internal-loopback-and-one-bus-write",
+    "authorization": "User requested functional tests and previously authorized exactly one 0x601 frame with the payload below",
+    "target": {"probe_or_adapter_serial": "207F346D5650", "transport": "JCAN MCP / USB / CAN"},
+    "baseline_evidence": "runtime/20260907T045647.630154Z-1788757007630184133-get_config.json",
+    "artifact_or_stimulus": {"internal_loopback_frames": 3, "internal_benchmark_count": 100, "passive_capture_duration_ms": 3000, "passive_capture_max_frames": 100, "single_send": {"id": 1537, "data_hex": "2B 17 10 00 E8 03 00 00", "extended": false, "fd": false, "brs": false, "remote": false, "count": 1, "settle_ms": 0}},
+    "limits": "One physical send invocation, no retry or periodic traffic under this preflight. Preserve existing adapter bitrate/configuration. Additional config/reboot/SDO/periodic scope pending clarification.",
+    "recovery_plan": "MCP finally calls CANStop and closes USB. Stop on errors. The requested target heartbeat write is not automatically reversed; no EEPROM save is requested.",
+    "observer": "User reports RK3588 candump running on the same bus; output not yet available to agent",
+    "approved": true
+  }
+}

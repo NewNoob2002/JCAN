@@ -1,0 +1,69 @@
+{
+  "serial": "207F346D5650",
+  "result": "Basic hardware smoke passed; three defect-specific HIL scenarios remain unverified",
+  "source_checksums": {
+    "jcan.py": "cba32bed115e48e76b26634f584720d123ebecc527c02768a56699b083fe12b7",
+    "jcan_mcp.py": "99051ac3a96e6a83e0356eb0e2513042a34c8d9d514a1af424eece709ded71fa"
+  },
+  "matches_host_test_artifacts": true,
+  "runtime_process_evidence": {
+    "pid": 209519,
+    "started_local": "2026-09-07T07:10:38+01:00",
+    "source_modified_local": {
+      "jcan.py": "2026-09-07T06:57:58+01:00",
+      "jcan_mcp.py": "2026-09-07T06:59:19+01:00"
+    },
+    "sdo_io_before": {
+      "rchar": 9599841,
+      "wchar": 15153,
+      "syscr": 1865,
+      "syscw": 21
+    },
+    "sdo_io_after": {
+      "rchar": 9639231,
+      "wchar": 16689,
+      "syscr": 2094,
+      "syscw": 27
+    },
+    "other_pids_unchanged": [
+      132591,
+      153934
+    ],
+    "conclusion": "I/O correlation supports current calls handled by post-fix process; no in-process build hash exposed"
+  },
+  "checks": {
+    "internal_loopback_frames": 3,
+    "sdo_read_invocations": 1,
+    "sdo_value": 1000,
+    "configuration_unchanged": true,
+    "active_periodic_tasks": 0,
+    "session_cleanup_error": null
+  },
+  "evidence_paths": [
+    "runtime/20260907T061138.547115Z-1788761498547142124-scan.json",
+    "runtime/20260907T061155.575517Z-1788761515575536196-get_config.json",
+    "runtime/20260907T061317.012905Z-1788761597012924912-loopback_test.json",
+    "runtime/20260907T061521.122427Z-1788761721122455046-sdo_read.json",
+    "runtime/20260907T061544.990046Z-1788761744990066659-periodic_list.json",
+    "runtime/20260907T061551.290309Z-1788761751290335295-get_config.json"
+  ],
+  "not_tested": [
+    "Multiple SDO responses in the same USB batch: normal read does not establish this condition",
+    "Periodic cleanup contention: no new periodic TX authorized with exact bounds",
+    "Startup drain failure and CANStop: no hardware fault injection performed"
+  ],
+  "proposed_periodic_test": {
+    "requires_explicit_authorization": true,
+    "serial": "207F346D5650",
+    "can_id": "0x123",
+    "extended": false,
+    "fd": false,
+    "remote": false,
+    "brs": false,
+    "data_hex": "11 22 33 44",
+    "period_ms": 100,
+    "count": 10,
+    "recovery": "Bounded completion, stop returned task if still active, CANStop and USB close; no retry on failure",
+    "verification": "Completion/cleanup status then configuration read; physical delivery needs independent receiver; normal run does not deterministically exercise cleanup race"
+  }
+}

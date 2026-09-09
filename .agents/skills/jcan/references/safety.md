@@ -1,16 +1,7 @@
-# JCAN safety boundary
+# JCAN CLI safety
 
-Use the smallest operation that can answer the request. Scanning or detecting an adapter does not authorize configuration changes, reboot, CAN transmission, SDO download, periodic traffic, or bootloader entry.
+Scanning does not authorize configuration changes, reboot, CAN transmission, SDO traffic, or periodic traffic. Use an explicit serial for every hardware command and obtain current authorization for state-changing or physical-bus operations.
 
-## Risk levels
+Single send means one invocation and no retry. One-shot CLI send defaults to a 1000 ms hold before CANStop; USB acceptance is not proof of bus delivery. Capture and periodic traffic must use exact finite bounds. On Ctrl-C, wait for CANStop and USB cleanup. Stop on every non-zero exit, ok=false, timeout, malformed response, or cleanup error.
 
-- Read-only: self-test, scan, configuration read, and bus-profile status.
-- Internal-only: silent-loopback and its bounded benchmark. They access the adapter but do not drive the physical bus.
-- Passive physical bus: bounded `jcan_capture` in silent mode. Confirm the serial, bitrate/profile match, duration, and frame limit.
-- State-changing: configuration writes, reboot, `jcan_send_once`, CANopen same-value SDO test, and periodic start. These require explicit current authorization for the exact target and bounds.
-
-Before a state-changing operation, record a safety preflight with the adapter serial, transport, exact configuration or CAN stimulus, limits, and cleanup/recovery path. For physical TX, confirm the profile is enabled and approved and that ID, standard/extended flag, CAN/CAN-FD flags, DLC, and payload are explicitly allowed. Never infer permission from a matching profile alone.
-
-Always keep waits and frame counts bounded. On failure, stop CAN and close USB; do not retry unless the user authorizes another attempt after the failure is classified. Periodic tasks must be stopped explicitly when no longer needed, and MCP shutdown must be allowed to complete cleanup.
-
-`IntoBoot` is outside the supported MCP surface. Bus-Off fault injection remains deferred until suitable external equipment and a separate authorization/preflight are available.
+The CLI exposes named configuration fields only and excludes bootloader entry. No bus profile is required or acts as an allowlist.

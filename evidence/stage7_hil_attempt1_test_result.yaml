@@ -1,0 +1,39 @@
+test_result:
+  schema_version: 1
+  source_revision: "1b0f39967b298de7c9858f1389a63bb4dd29d968 (dirty working tree)"
+  artifact_checksums:
+    jcan.py: "aeb7d834d8a02644e102ee6133d3d29e46b53e74ab26cf057ee61328715f29d1"
+    jcan_mcp.py_after_fix: "def1f28b88fc7bd207ac012cc775cd654e9ffc97bd858531b27379bc7f2fc22c"
+    test_jcan_mcp.py_after_fix: "0a9fb90833b1680625c691756fa983826c7652fdae3dce3e860b6e114429310a"
+  safety_preflight:
+    - "evidence/stage7_config_reboot_preflight.yaml"
+    - "evidence/stage7_single_frame_preflight.yaml"
+    - "evidence/stage7_periodic_preflight.yaml"
+  level: "hil"
+  target: "JooDevice JTool-CAN serial 207F346D5650"
+  command: "Five individually bounded unittest HIL cases with explicit JCAN_*_SERIAL environment variables"
+  timing:
+    started_at_utc: "2026-09-04T07:31:00Z"
+    duration_ms: 70617
+    timeout_ms: 165000
+  attempts: 1
+  passed: false
+  counts:
+    total: 5
+    passed: 4
+    failed: 1
+    skipped: 0
+  classified_failures:
+    - "periodic-rx-backlog: 1200/1200 frames sent with zero missed periods, but queued 0x581 download acknowledgements caused the post-run SDO upload read to consume stale command 0x60"
+  log:
+    periodic_run: "evidence/runtime/20260904T073425.882034Z-1788507265882056842-periodic_run.json"
+    periodic_session: "evidence/runtime/20260904T073425.889215Z-1788507265889231366-periodic_session.json"
+    periodic_list: "evidence/runtime/20260904T073425.893506Z-1788507265893525544-periodic_list.json"
+    failed_sdo_read: "evidence/runtime/20260904T073425.915632Z-1788507265915664656-sdo_read.json"
+  coverage: null
+  requirements:
+    - "adapter discovery/config/internal loopback"
+    - "bounded silent capture"
+    - "reversible configuration and reboot recovery"
+    - "single protocol-valid physical CAN frame"
+    - "bounded periodic CANopen same-value traffic and post-run verification"

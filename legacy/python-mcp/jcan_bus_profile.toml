@@ -1,9 +1,10 @@
+# Legacy MCP reference only. Rust CLI 1.0 does not read this file.
 schema_version = 1
 name = "JCAN physical bus"
 enabled = true
 approved = true
-authorization = "User authorized two 50 ms periodic HIL runs on CANopen node 0x01 RAM object 0x2008:00 U16: 60 seconds and 1500 same-value downloads, without EEPROM save"
-approved_at_utc = "2026-09-02T09:15:43Z"
+authorization = "User permanently authorized periodic transmission of the exact standard CAN 0x7FF rule: DLC 8, data 01 02 03 04 05 06 07 08"
+approved_at_utc = "2026-09-04T03:46:52Z"
 serial = "207F346D5650"
 
 # Physical bus declaration supplied by the operator.
@@ -30,15 +31,17 @@ busoff_recovery = "00"
 auto_retrans = "00"
 
 [[frames]]
-name = "tx-7ff-zero4"
+name = "tx-7ff-0102030405060708-periodic"
 direction = "tx"
 id = 0x7FF
 extended = false
 fd = false
 brs = false
 remote = false
-dlc = [4]
-data = ["00 00 00 00"]
+# Permanently authorized by the operator on 2026-09-04.
+periodic = true
+dlc = [8]
+data = ["01 02 03 04 05 06 07 08"]
 
 [[frames]]
 name = "canopen-node1-sdo-upload-2008-00"

@@ -1,0 +1,22 @@
+{
+  "safety_preflight": {
+    "schema_version": 1,
+    "authorization": "User requested continued post-fix hardware verification; repeat previously scoped single SDO upload",
+    "serial": "207F346D5650",
+    "transport": "JCAN MCP",
+    "baseline_evidence": "runtime/20260907T061155.575517Z-1788761515575536196-get_config.json",
+    "stimulus": {
+      "operation": "jcan_sdo_read",
+      "node": 1,
+      "index": 4119,
+      "subindex": 0,
+      "can_id": 1537,
+      "data_hex": "40 17 10 00 00 00 00 00",
+      "count": 1
+    },
+    "limits": "One SDO upload request, 2-second response deadline after bounded queue drain; no download, no periodic traffic, no configuration write or reboot, no retry",
+    "recovery_plan": "MCP finally CANStop and USB close; stop physical testing on failure",
+    "device_specific_units": "User confirms object 0x1017 value uses 0.5 ms units, so value 1000 corresponds to 500 ms",
+    "approved": true
+  }
+}

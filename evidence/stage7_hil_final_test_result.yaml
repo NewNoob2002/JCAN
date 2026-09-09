@@ -1,0 +1,41 @@
+test_result:
+  schema_version: 1
+  source_revision: "1b0f39967b298de7c9858f1389a63bb4dd29d968 (dirty working tree)"
+  artifact_checksums:
+    jcan.py: "aeb7d834d8a02644e102ee6133d3d29e46b53e74ab26cf057ee61328715f29d1"
+    jcan_mcp.py: "3c94b5c121b6bde9a85e957e82163aad62ea9df34984f70fe64a2c5078f87734"
+    test_jcan_mcp.py: "2a8f8ba429bd89d76e751facf30c4253ca06d494df7c83ccb25a141cb12757ff"
+  safety_preflight:
+    - "evidence/stage7_config_reboot_preflight.yaml"
+    - "evidence/stage7_single_frame_preflight.yaml"
+    - "evidence/stage7_periodic_attempt3_preflight.yaml"
+  level: "hil"
+  target: "JooDevice JTool-CAN serial 207F346D5650 and CANopen Node 1"
+  command: "Five bounded HIL unittest cases executed individually; periodic case completed on authorized attempt 3"
+  timing:
+    started_at_utc: "2026-09-04T07:31:00Z"
+    duration_ms: 207173
+    timeout_ms: 330000
+  attempts: 3
+  passed: true
+  counts:
+    total: 5
+    passed: 5
+    failed: 0
+    skipped: 0
+  classified_failures:
+    - "attempt 1 exposed periodic receive-backlog handling; fixed by bounded receive drain"
+    - "attempt 2 confirmed pre-existing backlog persisted across sessions; fixed by pre-transaction drain"
+  log:
+    attempt_1: "evidence/stage7_hil_attempt1_test_result.yaml"
+    attempt_2: "evidence/stage7_hil_attempt2_test_result.yaml"
+    attempt_3: "evidence/stage7_hil_attempt3_test_result.yaml"
+    periodic_bus_validation: "evidence/stage7_periodic_attempt3_bus_validation.yaml"
+    final_config: "evidence/runtime/20260904T075146.456639Z-1788508306456666468-get_config.json"
+  coverage: null
+  requirements:
+    - "adapter discovery, configuration read, internal loopback and benchmark"
+    - "bounded silent physical capture"
+    - "reversible configuration and reboot recovery"
+    - "single protocol-valid physical CAN frame"
+    - "bounded periodic CANopen same-value traffic and post-run verification"

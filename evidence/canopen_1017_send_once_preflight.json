@@ -1,0 +1,17 @@
+{
+  "serial": "207F346D5650",
+  "transport": "JCAN MCP jcan_send_once",
+  "authorization": "User explicitly authorized JCAN test after restarting the driver and starting RK3588 candump",
+  "baseline_evidence": "runtime/20260907T043655.705569Z-1788755815705596399-get_config.json",
+  "nominal_bitrate_declared": 500000,
+  "can_id": 1537,
+  "data_hex": "2B 17 10 00 E8 03 00 00",
+  "dlc": 8,
+  "fd": false,
+  "remote": false,
+  "brs": false,
+  "extended": false,
+  "count": 1,
+  "recovery": "Existing send_once finally executes CANStop and context closes USB. No automatic retry, no EEPROM save. Driver heartbeat value may become 1000; user has identified driver restart as recovery.",
+  "observation": "RK3588 candump; compare 0x601 request and 0x581 response"
+}

@@ -1,0 +1,28 @@
+test_result:
+  schema_version: 1
+  source_revision: "1b0f39967b298de7c9858f1389a63bb4dd29d968 (dirty working tree)"
+  artifact_checksums:
+    jcan.py: "aeb7d834d8a02644e102ee6133d3d29e46b53e74ab26cf057ee61328715f29d1"
+    jcan_mcp.py_after_attempt2_fix: "3c94b5c121b6bde9a85e957e82163aad62ea9df34984f70fe64a2c5078f87734"
+    test_jcan_mcp.py_after_attempt2_fix: "2a8f8ba429bd89d76e751facf30c4253ca06d494df7c83ccb25a141cb12757ff"
+  safety_preflight: "evidence/stage7_periodic_retry_preflight.yaml"
+  level: "hil"
+  target: "CANopen Node 1 through JTool-CAN serial 207F346D5650"
+  command: "JCAN_STAGE4_PERIODIC_SERIAL=207F346D5650 uv run python -m unittest -v test_jcan_mcp.McpStage4PeriodicHilTest.test_50ms_for_60s_and_1500_frames"
+  timing:
+    started_at_utc: "2026-09-04T07:42:30Z"
+    duration_ms: 415
+    timeout_ms: 165000
+  attempts: 2
+  passed: false
+  counts:
+    total: 1
+    passed: 0
+    failed: 1
+    skipped: 0
+  classified_failures:
+    - "pre-stimulus-rx-backlog: initial SDO upload consumed a stale 0x581 download acknowledgement left by attempt 1; periodic frame count for attempt 2 was zero"
+  log: "evidence/runtime/20260904T074231.312232Z-1788507751312275268-sdo_read.json"
+  coverage: null
+  requirements:
+    - "bounded periodic CANopen same-value traffic and post-run verification"

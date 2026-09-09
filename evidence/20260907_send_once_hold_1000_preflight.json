@@ -1,0 +1,15 @@
+{
+  "safety_preflight": {
+    "schema_version": 1,
+    "operation": "single-frame-stop-timing-diagnostic",
+    "authorization": "User confirmed one additional identical frame with settle_ms=1000",
+    "serial": "207F346D5650",
+    "transport": "JCAN MCP / USB / CAN",
+    "baseline_evidence": "runtime/20260907T053438.482932Z-1788759278482958392-get_config.json",
+    "stimulus": {"can_id": 1537, "data_hex": "2B 17 10 00 E8 03 00 00", "dlc": 8, "extended": false, "fd": false, "remote": false, "brs": false, "count": 1, "settle_ms": 1000},
+    "limits": "Exactly one send_once invocation. No retry, periodic traffic, configuration changes, or EEPROM save.",
+    "recovery_plan": "MCP holds CAN running for 1000 ms after USB acceptance, then finally CANStop and USB close. Stop on failure; no automatic additional frame.",
+    "observer": "RK3588 candump supplied by user; physical delivery requires independent matching frame",
+    "approved": true
+  }
+}

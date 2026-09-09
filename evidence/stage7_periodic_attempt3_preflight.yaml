@@ -1,0 +1,18 @@
+safety_preflight:
+  schema_version: 1
+  timestamp_utc: "2026-09-04T07:48:26Z"
+  operation: "bus-write"
+  authorization: "User explicitly authorized attempt 3 after attempt-2 failure classification"
+  target:
+    board: "CANopen Node 1 on JCAN physical bus"
+    hardware_revision: "unknown"
+    probe_or_adapter_serial: "207F346D5650"
+    transport: "can"
+  artifact_or_stimulus: "Standard Classic CAN ID 0x601, DLC 8, expedited U16 same-value SDO download 2B 08 20 00 C8 00 00 00"
+  artifact_checksums:
+    jcan.py: "aeb7d834d8a02644e102ee6133d3d29e46b53e74ab26cf057ee61328715f29d1"
+    jcan_mcp.py: "3c94b5c121b6bde9a85e957e82163aad62ea9df34984f70fe64a2c5078f87734"
+    test_jcan_mcp.py: "2a8f8ba429bd89d76e751facf30c4253ca06d494df7c83ccb25a141cb12757ff"
+  limits: "Attempt 3 only; 500 kbit/s nominal; 50 ms period; 1200 frames then 1500 frames; no EEPROM save; total 2700 periodic frames"
+  recovery_plan: "Before each SDO/periodic transaction MCP drains stale receive data for at most 2000 ms; after each periodic run it drains again, stops CAN, closes USB, and verifies 0x2008:00 remains 200"
+  approved: true

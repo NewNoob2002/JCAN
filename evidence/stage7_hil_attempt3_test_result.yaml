@@ -1,0 +1,39 @@
+test_result:
+  schema_version: 1
+  source_revision: "1b0f39967b298de7c9858f1389a63bb4dd29d968 (dirty working tree)"
+  artifact_checksums:
+    jcan.py: "aeb7d834d8a02644e102ee6133d3d29e46b53e74ab26cf057ee61328715f29d1"
+    jcan_mcp.py: "3c94b5c121b6bde9a85e957e82163aad62ea9df34984f70fe64a2c5078f87734"
+    test_jcan_mcp.py: "2a8f8ba429bd89d76e751facf30c4253ca06d494df7c83ccb25a141cb12757ff"
+  safety_preflight: "evidence/stage7_periodic_attempt3_preflight.yaml"
+  level: "hil"
+  target: "CANopen Node 1 through JTool-CAN serial 207F346D5650"
+  command: "JCAN_STAGE4_PERIODIC_SERIAL=207F346D5650 uv run python -m unittest -v test_jcan_mcp.McpStage4PeriodicHilTest.test_50ms_for_60s_and_1500_frames"
+  timing:
+    started_at_utc: "2026-09-04T07:49:12Z"
+    duration_ms: 136141
+    timeout_ms: 165000
+  attempts: 3
+  passed: true
+  counts:
+    total: 1
+    passed: 1
+    failed: 0
+    skipped: 0
+  classified_failures: []
+  log:
+    initial_sdo_read: "evidence/runtime/20260904T074912.745119Z-1788508152745145529-sdo_read.json"
+    periodic_1200: "evidence/runtime/20260904T075012.779064Z-1788508212779080731-periodic_run.json"
+    cleanup_1200: "evidence/runtime/20260904T075012.817499Z-1788508212817534181-periodic_session.json"
+    post_read_1200: "evidence/runtime/20260904T075012.895840Z-1788508212895860687-sdo_read.json"
+    pre_read_1500: "evidence/runtime/20260904T075013.320189Z-1788508213320219632-sdo_read.json"
+    periodic_1500: "evidence/runtime/20260904T075128.353329Z-1788508288353361890-periodic_run.json"
+    cleanup_1500: "evidence/runtime/20260904T075128.393097Z-1788508288393122222-periodic_session.json"
+    final_sdo_read: "evidence/runtime/20260904T075128.432800Z-1788508288432826030-sdo_read.json"
+  coverage: null
+  requirements:
+    - "1200 and 1500 same-value SDO frames at 50 ms"
+    - "zero missed periods"
+    - "maximum scheduling jitter below 50 ms"
+    - "0x2008:00 remains 200 before and after each run"
+    - "receive queue drained and CAN session stopped without cleanup error"

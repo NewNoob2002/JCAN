@@ -108,9 +108,10 @@ dlc = [8]
 
 
 class FakePhysicalCan:
-    def __init__(self, frames=(), send_delay=0):
+    def __init__(self, frames=(), send_delay=0, release_frames_on_send=False):
         self.config = FakeUsb().original
-        self.frames = list(frames)
+        self.frames = [] if release_frames_on_send else list(frames)
+        self.pending_frames = list(frames) if release_frames_on_send else []
         self.send_delay = send_delay
         self.started = []
         self.sent = []
@@ -121,7 +122,7 @@ class FakePhysicalCan:
         return self
 
     def __exit__(self, *_args):
-        pass
+        self.close()
 
     def _config_get(self, name, _size):
         return self.config[name]
@@ -142,6 +143,8 @@ class FakePhysicalCan:
         if self.send_delay:
             time.sleep(self.send_delay)
         self.sent.append((can_id, data, flags))
+        if self.pending_frames:
+            self.frames.append(self.pending_frames.pop(0))
 
     def receive(self, _timeout_ms):
         return self.frames.pop(0) if self.frames else b""
@@ -338,7 +341,7 @@ class McpStdioTest(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(set(schemas["jcan_reboot"]["properties"]), {"serial", "timeout_s"})
                     self.assertEqual(
                         set(schemas["jcan_send_once"]["properties"]),
-                        {"serial", "can_id", "data_hex", "fd", "remote", "brs", "extended"},
+                        {"serial", "can_id", "data_hex", "fd", "remote", "brs", "extended", "settle_ms"},
                     )
                     self.assertEqual(
                         set(schemas["jcan_capture"]["properties"]),
@@ -381,13 +384,12 @@ class McpStdioTest(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(result.structuredContent["data"]["nominal_bitrate"], 500000)
                     self.assertEqual(result.structuredContent["data"]["frames"][0]["id"], 0x7FF)
                     self.assertFalse(result.structuredContent["data"]["frames"][0]["extended"])
-                    self.assertFalse(result.structuredContent["data"]["frames"][0]["periodic"])
                     result = await asyncio.wait_for(
                         session.call_tool(
                             "jcan_send_once",
                             {
-                                "serial": "207F346D5650", "can_id": 0x7FF,
-                                "data_hex": "00 00 00 01", "extended": False,
+                                "serial": "207F346D5650", "can_id": 0x800,
+                                "data_hex": "00", "extended": False,
                             },
                         ),
                         5,
@@ -499,66 +501,179 @@ class McpHostTest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result["reenumerated"])
         self.assertTrue(usb.rebooted)
 
-    def test_physical_profile_send_and_capture(self):
-        profile_path = Path(self.temp.name) / "profile.toml"
-        write_active_profile(profile_path)
-        profile = jcan_mcp.BusProfile.load(profile_path)
-        self.assertTrue(profile.enabled and profile.approved)
-
+    def test_unrestricted_send_and_capture(self):
         can = FakePhysicalCan()
         result = jcan_mcp._send_once(
             "TEST", 0x123, "11 22", fd=False, remote=False, brs=False, extended=False,
-            profile_path=profile_path, can_factory=lambda _serial: can,
+            can_factory=lambda _serial: can,
         )
-        self.assertEqual(result["rule"], "command")
+        self.assertEqual(result["frame"]["id"], 0x123)
         self.assertEqual(can.started, [MODES["normal"]])
         self.assertTrue(can.stopped and len(can.sent) == 1)
 
         can = FakePhysicalCan()
         can.config = {**can.config, "term_res": b"\1"}
-        with self.assertRaises(JCanError):
-            jcan_mcp._send_once(
-                "TEST", 0x123, "11 22", fd=False, remote=False, brs=False, extended=False,
-                profile_path=profile_path, can_factory=lambda _serial: can,
-            )
-        self.assertFalse(can.started or can.sent)
-
-        with self.assertRaises(JCanError):
-            jcan_mcp._send_once(
-                "TEST", 0x123, "11 23", fd=False, remote=False, brs=False, extended=False,
-                profile_path=profile_path, can_factory=lambda _serial: self.fail("USB must not open"),
-            )
-
-        can = FakePhysicalCan([raw_frame(0x321, bytes.fromhex("33 44"))])
-        result = jcan_mcp._capture(
-            "TEST", 100, 1, profile_path=profile_path, can_factory=lambda _serial: can,
+        jcan_mcp._send_once(
+            "TEST", 0x456, "11 23", fd=False, remote=False, brs=False, extended=False,
+            can_factory=lambda _serial: can,
         )
-        self.assertEqual((result["received_frames"], result["matched_frames"]), (1, 1))
+        self.assertEqual(can.sent[0][0:2], (0x456, bytes.fromhex("11 23")))
+
+        can = FakePhysicalCan()
+        jcan_mcp._send_once(
+            "TEST", 0x1ABCDE, "00 01 02 03 04 05 06 07 08 09 0A 0B",
+            fd=True, remote=False, brs=True, extended=True, can_factory=lambda _serial: can,
+        )
+        self.assertEqual(can.sent[0][0], 0x1ABCDE)
+        self.assertEqual(can.sent[0][2], {"fd": True, "remote": False, "brs": True, "extended": True})
+
+        can = FakePhysicalCan([
+            raw_frame(0x321, bytes.fromhex("33 44")),
+            raw_frame(0x456, bytes.fromhex("55 66 77")),
+        ])
+        result = jcan_mcp._capture(
+            "TEST", 100, 2, can_factory=lambda _serial: can,
+        )
+        self.assertEqual((result["received_frames"], result["matched_frames"], result["dropped_frames"]), (2, 2, 0))
+        self.assertEqual([frame["id"] for frame in result["samples"]], [0x321, 0x456])
         self.assertEqual(can.started, [MODES["silent"]])
         self.assertTrue(can.stopped)
 
-    def test_profile_gate_rejects_before_usb(self):
+    def test_send_once_bounded_hold_and_cleanup(self):
+        flags = dict(fd=False, remote=False, brs=False, extended=False)
+        for settle_ms in (0, 100, 2000):
+            can = FakePhysicalCan()
+
+            def hold(seconds):
+                self.assertEqual(seconds, settle_ms / 1000)
+                self.assertEqual(can.sent, [(0x601, bytes.fromhex("2B171000E8030000"), flags)])
+                self.assertFalse(can.stopped or can.closed)
+
+            with self.subTest(settle_ms=settle_ms), patch.object(jcan_mcp.time, "sleep", side_effect=hold) as sleep:
+                result = jcan_mcp._send_once(
+                    "TEST", 0x601, "2B171000E8030000", **flags,
+                    settle_ms=settle_ms, can_factory=lambda _: can,
+                )
+                self.assertEqual(sleep.call_count, int(settle_ms > 0))
+            self.assertTrue(can.stopped and can.closed)
+            self.assertEqual(result["completion"], "usb_command_accepted")
+            self.assertEqual(result["settle_ms"], settle_ms)
+
+        for invalid in (-1, 2001, True, 1.5):
+            with self.subTest(invalid=invalid), self.assertRaises(JCanError):
+                jcan_mcp._send_once(
+                    "TEST", 0x601, "2B171000E8030000", **flags,
+                    settle_ms=invalid, can_factory=lambda _: self.fail("USB must not open"),
+                )
+        can = FakePhysicalCan()
+        with patch.object(can, "send", side_effect=OSError("send failed")), patch.object(jcan_mcp.time, "sleep") as sleep:
+            with self.assertRaises(OSError):
+                jcan_mcp._send_once(
+                    "TEST", 0x601, "2B171000E8030000", **flags,
+                    settle_ms=100, can_factory=lambda _: can,
+                )
+            sleep.assert_not_called()
+        self.assertTrue(can.stopped and can.closed)
+
+    def test_long_capture_deadline_and_frame_limit(self):
+        can = FakePhysicalCan()
+        elapsed = 0.0
+
+        def receive(timeout_ms):
+            nonlocal elapsed
+            self.assertTrue(1 <= timeout_ms <= 100)
+            elapsed += timeout_ms / 1000
+            return b""  # A normal USB read timeout produces no frames.
+
+        with patch.object(jcan_mcp.time, "monotonic", side_effect=lambda: elapsed), patch.object(can, "receive", side_effect=receive):
+            result = jcan_mcp._capture("TEST", 600000, 100000, can_factory=lambda _: can)
+        self.assertAlmostEqual(result["duration_ms"], 600000, delta=1)
+        self.assertEqual(result["received_frames"], 0)
+        self.assertTrue(can.stopped and can.closed)
+
+        can = FakePhysicalCan([raw_frame(0x321, b"12") * 1002])
+        result = jcan_mcp._capture("TEST", 600000, 1001, can_factory=lambda _: can)
+        self.assertEqual(len(result["samples"]), 1001)
+        self.assertEqual(result["received_frames"], 1001)
+        self.assertTrue(can.stopped and can.closed)
+
+    def test_capture_invalid_bounds_and_error_cleanup(self):
+        for duration, frames in ((0, 1), (600001, 1), (True, 1), (1.5, 1),
+                                 (1, 0), (1, 100001), (1, True), (1, 1.5)):
+            with self.subTest(duration=duration, frames=frames), self.assertRaises(JCanError):
+                jcan_mcp._capture(
+                    "TEST", duration, frames, can_factory=lambda _: self.fail("USB must not open"),
+                )
+        for operation in ("start", "receive", "stop"):
+            can = FakePhysicalCan([raw_frame(0x321, b"12")])
+            with self.subTest(operation=operation), patch.object(can, operation, side_effect=OSError("USB failure")), self.assertRaises(OSError):
+                jcan_mcp._capture("TEST", 600000, 1, can_factory=lambda _: can)
+            self.assertTrue(can.closed)
+            if operation != "stop":
+                self.assertTrue(can.stopped)
+
+    async def test_capture_client_timeout_stops_worker(self):
+        can = FakePhysicalCan()
+        entered = asyncio.Event()
+        loop = asyncio.get_running_loop()
+        devices = jcan_mcp.DeviceManager()
+        ctx = SimpleNamespace(request_context=SimpleNamespace(lifespan_context=SimpleNamespace(
+            devices=devices, hardware_gate=asyncio.Lock(),
+            periodic=SimpleNamespace(is_active=lambda _: False),
+        )))
+
+        def receive(timeout_ms):
+            loop.call_soon_threadsafe(entered.set)
+            time.sleep(timeout_ms / 1000)
+            return b""
+
+        try:
+            with patch.object(jcan_mcp, "LibUsb"), patch.object(jcan_mcp, "JCan", return_value=can), patch.object(can, "receive", side_effect=receive):
+                task = asyncio.create_task(jcan_mcp.jcan_capture("TEST", ctx, 600000, 100000))
+                try:
+                    await asyncio.wait_for(entered.wait(), 2)
+                    with self.assertRaises(TimeoutError):
+                        await asyncio.wait_for(task, 0.01)
+                finally:
+                    task.cancel()
+                    await asyncio.gather(task, return_exceptions=True)
+                # A queued worker operation can run only after capture cleanup.
+                await asyncio.wait_for(devices.run(lambda: None), 2)
+            self.assertTrue(can.stopped and can.closed)
+        finally:
+            devices.close()
+
+    def test_protocol_validation_rejects_before_usb(self):
         with self.assertRaises(JCanError):
             jcan_mcp._send_once(
-                "207F346D5650", 0x7FF, "00 00 00 01", fd=False, remote=False, brs=False, extended=False,
-                profile_path=ROOT / "jcan_bus_profile.toml", can_factory=lambda _serial: self.fail("USB must not open"),
+                "TEST", 0x800, "00", fd=False, remote=False, brs=False, extended=False,
+                can_factory=lambda _serial: self.fail("USB must not open"),
+            )
+        with self.assertRaises(JCanError):
+            jcan_mcp._send_once(
+                "TEST", 0x123, "00 01 02 03 04 05 06 07 08",
+                fd=False, remote=False, brs=False, extended=False,
+                can_factory=lambda _serial: self.fail("USB must not open"),
+            )
+        with self.assertRaises(JCanError):
+            jcan_mcp._send_once(
+                "TEST", 0x123, "00 01 02 03 04 05 06 07 08",
+                fd=True, remote=False, brs=False, extended=False,
+                can_factory=lambda _serial: self.fail("USB must not open"),
+            )
+        with self.assertRaises(JCanError):
+            jcan_mcp._send_once(
+                "TEST", 0x123, "", fd=False, remote=False, brs=True, extended=False,
+                can_factory=lambda _serial: self.fail("USB must not open"),
             )
 
-        profile_path = Path(self.temp.name) / "unapproved.toml"
-        write_active_profile(profile_path)
-        profile_path.write_text(profile_path.read_text().replace("approved = true", "approved = false"))
-        with self.assertRaises(JCanError):
-            jcan_mcp.BusProfile.load(profile_path)
-
     def test_sdo_read_and_same_value_write(self):
-        profile_path = Path(self.temp.name) / "profile.toml"
-        write_active_profile(profile_path)
         upload = bytes.fromhex("4B 08 20 00 F4 01 00 00")
         download = bytes.fromhex("60 08 20 00 00 00 00 00")
 
-        can = FakePhysicalCan([raw_frame(0x581, upload)])
+        can = FakePhysicalCan([raw_frame(0x581, upload)], release_frames_on_send=True)
         result = jcan_mcp._sdo_read(
-            "TEST", 1, 0x2008, 0, profile_path=profile_path, can_factory=lambda _serial: can,
+            "TEST", 1, 0x2008, 0, can_factory=lambda _serial: can,
         )
         self.assertEqual((result["value_unsigned"], result["value_hex"]), (500, "F4 01"))
         self.assertEqual(can.sent[0][0:2], (0x601, bytes.fromhex("40 08 20 00 00 00 00 00")))
@@ -566,9 +681,9 @@ class McpHostTest(unittest.IsolatedAsyncioTestCase):
 
         can = FakePhysicalCan([
             raw_frame(0x581, upload), raw_frame(0x581, download), raw_frame(0x581, upload),
-        ])
+        ], release_frames_on_send=True)
         result = jcan_mcp._sdo_u16_same_value_test(
-            "TEST", 1, 0x2008, 0, profile_path=profile_path, can_factory=lambda _serial: can,
+            "TEST", 1, 0x2008, 0, can_factory=lambda _serial: can,
         )
         self.assertEqual(result["value_unsigned"], 500)
         self.assertFalse(result["write_changed_value"] or result["eeprom_save"])
@@ -579,13 +694,113 @@ class McpHostTest(unittest.IsolatedAsyncioTestCase):
         ])
         self.assertTrue(can.stopped)
 
-    async def test_periodic_scheduler_completion_and_stop(self):
-        profile_path = Path(self.temp.name) / "profile.toml"
-        write_active_profile(profile_path)
+    def test_sdo_batched_unrelated_response(self):
+        unrelated = raw_frame(0x581, bytes.fromhex("4B 08 20 00 F4 01 00 00"))
+        upload = raw_frame(0x581, bytes.fromhex("4B 17 10 00 E8 03 00 00"))
+        download = raw_frame(0x581, bytes.fromhex("60 17 10 00 00 00 00 00"))
+        for same_value in (False, True):
+            with self.subTest(same_value=same_value):
+                frames = [unrelated + upload]
+                if same_value:
+                    frames += [unrelated + download, unrelated + upload]
+                can = FakePhysicalCan(frames, release_frames_on_send=True)
+                operation = jcan_mcp._sdo_u16_same_value_test if same_value else jcan_mcp._sdo_read
+                result = operation("TEST", 1, 0x1017, 0, can_factory=lambda _: can)
+                self.assertEqual(result["value_unsigned"], 1000)
+                self.assertEqual(len(can.sent), 3 if same_value else 1)
+                self.assertTrue(can.stopped and can.closed)
+
+    async def test_periodic_holds_gate_until_cleanup_finishes(self):
         devices = jcan_mcp.DeviceManager()
-        can = FakePhysicalCan(send_delay=0.025)
+        gate = asyncio.Lock()
+        can = FakePhysicalCan()
+        manager = jcan_mcp.PeriodicManager(devices, gate, can_factory=lambda _: can)
+        entered, release = asyncio.Event(), asyncio.Event()
+        original_run = devices.run
+        observations = []
+        probe = None
+
+        async def pause_cleanup(function, *args, **kwargs):
+            if function is jcan_mcp._drain_receive:
+                entered.set()
+                await release.wait()
+            return await original_run(function, *args, **kwargs)
+
+        ctx = SimpleNamespace(request_context=SimpleNamespace(lifespan_context=SimpleNamespace(
+            devices=devices, hardware_gate=gate, periodic=manager,
+        )))
+        try:
+            with patch.object(devices, "run", side_effect=pause_cleanup):
+                await manager.start("TEST", 0x123, "11", 10, 1,
+                                    fd=False, remote=False, brs=False, extended=False)
+                await asyncio.wait_for(entered.wait(), 1)
+                self.assertTrue(gate.locked())
+                self.assertFalse(can.stopped or can.closed)
+                probe = asyncio.create_task(jcan_mcp._hardware_call(
+                    ctx, "cleanup_probe", "TEST", lambda: observations.append(can.closed)))
+                await asyncio.sleep(0)
+                self.assertFalse(probe.done())
+                self.assertEqual(observations, [])
+                release.set()
+                result = await asyncio.wait_for(probe, 1)
+                self.assertTrue(result["ok"])
+                self.assertEqual(observations, [True])
+                self.assertTrue(can.stopped and can.closed)
+        finally:
+            release.set()
+            await asyncio.wait_for(manager.close(), 1)
+            if probe is not None and not probe.done():
+                await asyncio.wait_for(probe, 1)
+            devices.close()
+
+    def test_periodic_startup_failure_always_stops_and_closes(self):
+        for stop_fails, close_fails in ((False, False), (True, False), (False, True), (True, True)):
+            with self.subTest(stop_fails=stop_fails, close_fails=close_fails):
+                can = FakePhysicalCan()
+                manager = jcan_mcp.PeriodicManager(None, None, can_factory=lambda _: can)
+                with (
+                    patch.object(jcan_mcp, "_drain_receive", side_effect=JCanError("startup failed")),
+                    patch.object(can, "stop", side_effect=JCanError("stop failed") if stop_fails else can.stop) as stop,
+                    patch.object(can, "close", side_effect=JCanError("close failed") if close_fails else can.close) as close,
+                    self.assertRaises(JCanError) as caught,
+                ):
+                    manager._open("TEST")
+                stop.assert_called_once_with()
+                close.assert_called_once_with()
+                self.assertIn("startup failed", str(caught.exception))
+                if stop_fails or close_fails:
+                    self.assertIsInstance(caught.exception, jcan_mcp.RecoverableOperationError)
+                    errors = caught.exception.data["cleanup_errors"]
+                    self.assertEqual(len(errors), int(stop_fails) + int(close_fails))
+
+    async def test_periodic_startup_cleanup_error_reaches_session_result(self):
+        devices = jcan_mcp.DeviceManager()
+        can = FakePhysicalCan()
+        manager = jcan_mcp.PeriodicManager(devices, asyncio.Lock(), can_factory=lambda _: can)
+        try:
+            with (
+                patch.object(jcan_mcp, "_drain_receive", side_effect=JCanError("startup failed")),
+                patch.object(can, "stop", side_effect=JCanError("stop failed")),
+                patch.object(jcan_mcp, "_result") as record,
+            ):
+                with self.assertRaises(jcan_mcp.RecoverableOperationError):
+                    await manager.start("TEST", 0x123, "11", 10, 1,
+                                        fd=False, remote=False, brs=False, extended=False)
+                await asyncio.wait_for(manager.close(), 1)
+                self.assertIn("CANStop: stop failed", manager.cleanup_error)
+                self.assertTrue(can.closed)
+                session = next(call for call in record.call_args_list if call.args[0] == "periodic_session")
+                self.assertEqual(session.kwargs["data"]["cleanup_state"], "failed")
+                self.assertIsNotNone(session.kwargs["error"])
+        finally:
+            await manager.close()
+            devices.close()
+
+    async def test_periodic_scheduler_completion_and_stop(self):
+        devices = jcan_mcp.DeviceManager()
+        can = FakePhysicalCan([raw_frame(0x581, bytes.fromhex("60 08 20 00 00 00 00 00"))], send_delay=0.025)
         manager = jcan_mcp.PeriodicManager(
-            devices, (hardware_gate := asyncio.Lock()), profile_path=profile_path, can_factory=lambda _serial: can,
+            devices, (hardware_gate := asyncio.Lock()), can_factory=lambda _serial: can,
         )
         try:
             started = await manager.start(
@@ -602,6 +817,7 @@ class McpHostTest(unittest.IsolatedAsyncioTestCase):
             self.assertGreater(completed["missed_periods"], 0)
             self.assertEqual(can.started, [MODES["normal"]])
             self.assertTrue(can.stopped and can.closed)
+            self.assertFalse(can.frames)
 
             can = FakePhysicalCan()
             manager.can_factory = lambda _serial: can
@@ -624,39 +840,34 @@ class McpHostTest(unittest.IsolatedAsyncioTestCase):
 
             with self.assertRaises(JCanError):
                 await manager.start(
-                    "TEST", 0x123, "11 23", 10, 1,
+                    "TEST", 0x123, "00 01 02 03 04 05 06 07 08", 10, 1,
                     fd=False, remote=False, brs=False, extended=False,
                 )
         finally:
             await manager.close()
             devices.close()
 
-    async def test_periodic_requires_explicit_profile_authorization(self):
-        profile_path = Path(self.temp.name) / "profile.toml"
-        write_active_profile(profile_path)
-        profile_path.write_text(profile_path.read_text().replace("periodic = true\n", ""))
+    async def test_periodic_validates_frame_before_usb(self):
         devices = jcan_mcp.DeviceManager()
         manager = jcan_mcp.PeriodicManager(
-            devices, asyncio.Lock(), profile_path=profile_path,
+            devices, asyncio.Lock(),
             can_factory=lambda _serial: self.fail("USB must not open"),
         )
         try:
             with self.assertRaises(JCanError):
                 await manager.start(
-                    "TEST", 0x123, "11 22", 10, 1,
-                    fd=False, remote=False, brs=False, extended=False,
+                    "TEST", 0x20000000, "11 22", 10, 1,
+                    fd=False, remote=False, brs=False, extended=True,
                 )
         finally:
             await manager.close()
             devices.close()
 
     async def test_periodic_task_limit_and_close_cleanup(self):
-        profile_path = Path(self.temp.name) / "profile.toml"
-        write_active_profile(profile_path)
         devices = jcan_mcp.DeviceManager()
         can = FakePhysicalCan()
         manager = jcan_mcp.PeriodicManager(
-            devices, asyncio.Lock(), profile_path=profile_path, can_factory=lambda _serial: can,
+            devices, asyncio.Lock(), can_factory=lambda _serial: can,
         )
         try:
             tasks = [
@@ -758,7 +969,7 @@ class McpStage3HilTest(unittest.IsolatedAsyncioTestCase):
 
 @unittest.skipUnless(os.environ.get("JCAN_STAGE4_SEND_SERIAL"), "set JCAN_STAGE4_SEND_SERIAL after physical-bus safety preflight")
 class McpStage4PhysicalHilTest(unittest.IsolatedAsyncioTestCase):
-    async def test_one_whitelisted_standard_frame(self):
+    async def test_one_protocol_valid_standard_frame(self):
         serial = os.environ["JCAN_STAGE4_SEND_SERIAL"]
         server = StdioServerParameters(command=sys.executable, args=[str(ROOT / "jcan_mcp.py")], cwd=ROOT)
         async with stdio_client(server) as (read, write):
@@ -770,14 +981,21 @@ class McpStage4PhysicalHilTest(unittest.IsolatedAsyncioTestCase):
                         {
                             "serial": serial,
                             "can_id": 0x7FF,
-                            "data_hex": "00 00 00 00",
+                            "data_hex": "01 02 03 04 05 06 07 08",
                             "extended": False,
                         },
                     ),
                     10,
                 )
                 self.assertTrue(result.structuredContent["ok"])
-                self.assertEqual(result.structuredContent["data"]["rule"], "tx-7ff-zero4")
+                self.assertEqual(result.structuredContent["data"]["frame"], {
+                    "id": 0x7FF,
+                    "data": "01 02 03 04 05 06 07 08",
+                    "fd": False,
+                    "remote": False,
+                    "brs": False,
+                    "extended": False,
+                })
 
 
 @unittest.skipUnless(os.environ.get("JCAN_STAGE4_CAPTURE_SERIAL"), "set JCAN_STAGE4_CAPTURE_SERIAL after passive-capture preflight")
@@ -803,46 +1021,64 @@ class McpStage4CaptureHilTest(unittest.IsolatedAsyncioTestCase):
 @unittest.skipUnless(os.environ.get("JCAN_STAGE4_PERIODIC_SERIAL"), "set JCAN_STAGE4_PERIODIC_SERIAL after periodic-bus safety preflight")
 class McpStage4PeriodicHilTest(unittest.IsolatedAsyncioTestCase):
     async def _run_case(self, serial, count, name):
-        devices = jcan_mcp.DeviceManager()
-        adapters = []
-
-        def factory(selected):
-            adapter = SdoResponseCan(selected)
-            adapters.append(adapter)
-            return adapter
-
-        manager = jcan_mcp.PeriodicManager(devices, asyncio.Lock(), can_factory=factory)
+        server = StdioServerParameters(command=sys.executable, args=[str(ROOT / "jcan_mcp.py")], cwd=ROOT)
         started_at = time.monotonic()
-        try:
-            before = await devices.run(jcan_mcp._sdo_read, serial, 1, 0x2008, 0)
-            self.assertEqual(before["value_unsigned"], 200)
-            started = await manager.start(
-                serial, 0x601, "2B 08 20 00 C8 00 00 00", 50, count,
-                fd=False, remote=False, brs=False, extended=False,
-            )
-            deadline = asyncio.get_running_loop().time() + count * 0.05 + 15
-            while manager.runner is not None and asyncio.get_running_loop().time() < deadline:
-                await asyncio.sleep(0.1)
-            self.assertIsNone(manager.runner, "周期任务未在截止时间内完成")
-            listing = await manager.list(serial)
-            result = next(item for item in listing["recent"] if item["task_id"] == started["task_id"])
-            after = await devices.run(jcan_mcp._sdo_read, serial, 1, 0x2008, 0)
-            elapsed_ms = (time.monotonic() - started_at) * 1000
-            self.assertEqual((result["state"], result["sent_count"], result["missed_periods"]), ("completed", count, 0))
-            self.assertEqual(len(adapters), 1)
-            self.assertEqual(len(adapters[0].responses), count)
-            self.assertTrue(all(response == bytes.fromhex("60 08 20 00 00 00 00 00") for response in adapters[0].responses))
-            self.assertEqual(after["value_unsigned"], 200)
-            self.assertLess(result["timing"]["jitter_ms"]["max"], 50)
-            print(json.dumps({
-                "case": name, "period_ms": 50, "requested_frames": count,
-                "elapsed_ms": elapsed_ms, "sdo_responses": len(adapters[0].responses),
-                "before": before["value_unsigned"], "after": after["value_unsigned"],
-                "periodic": result,
-            }, ensure_ascii=False))
-        finally:
-            await manager.close()
-            devices.close()
+        async with stdio_client(server) as (read, write):
+            async with ClientSession(read, write) as session:
+                await asyncio.wait_for(session.initialize(), 5)
+                before_result = await asyncio.wait_for(
+                    session.call_tool("jcan_sdo_read", {
+                        "serial": serial, "node": 1, "index": 0x2008, "subindex": 0,
+                    }),
+                    10,
+                )
+                self.assertTrue(before_result.structuredContent["ok"])
+                before = before_result.structuredContent["data"]
+                self.assertEqual(before["value_unsigned"], 200)
+                started_result = await asyncio.wait_for(
+                    session.call_tool("jcan_periodic_start", {
+                        "serial": serial,
+                        "can_id": 0x601,
+                        "data_hex": "2B 08 20 00 C8 00 00 00",
+                        "period_ms": 50,
+                        "count": count,
+                    }),
+                    10,
+                )
+                self.assertTrue(started_result.structuredContent["ok"])
+                task_id = started_result.structuredContent["data"]["task_id"]
+                deadline = asyncio.get_running_loop().time() + count * 0.05 + 15
+                result = None
+                while result is None and asyncio.get_running_loop().time() < deadline:
+                    listing_result = await asyncio.wait_for(
+                        session.call_tool("jcan_periodic_list", {"serial": serial}), 5
+                    )
+                    self.assertTrue(listing_result.structuredContent["ok"])
+                    result = next(
+                        (item for item in listing_result.structuredContent["data"]["recent"] if item["task_id"] == task_id),
+                        None,
+                    )
+                    if result is None:
+                        await asyncio.sleep(0.1)
+                self.assertIsNotNone(result, "周期任务未在截止时间内完成")
+                after_result = await asyncio.wait_for(
+                    session.call_tool("jcan_sdo_read", {
+                        "serial": serial, "node": 1, "index": 0x2008, "subindex": 0,
+                    }),
+                    10,
+                )
+                self.assertTrue(after_result.structuredContent["ok"])
+                after = after_result.structuredContent["data"]
+                elapsed_ms = (time.monotonic() - started_at) * 1000
+                self.assertEqual((result["state"], result["sent_count"], result["missed_periods"]), ("completed", count, 0))
+                self.assertEqual(after["value_unsigned"], 200)
+                self.assertLess(result["timing"]["jitter_ms"]["max"], 50)
+                print(json.dumps({
+                    "case": name, "period_ms": 50, "requested_frames": count,
+                    "elapsed_ms": elapsed_ms,
+                    "before": before["value_unsigned"], "after": after["value_unsigned"],
+                    "periodic": result,
+                }, ensure_ascii=False))
 
     async def test_50ms_for_60s_and_1500_frames(self):
         serial = os.environ["JCAN_STAGE4_PERIODIC_SERIAL"]
