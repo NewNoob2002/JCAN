@@ -138,15 +138,10 @@ pub fn scan() -> Result<Vec<DeviceInfo>> {
         if descriptor.vendor_id() != VID || descriptor.product_id() != PID {
             continue;
         }
-        let serial = device
+        let handle = device
             .open()
-            .ok()
-            .and_then(|handle| {
-                descriptor
-                    .serial_number_string_index()
-                    .and_then(|index| handle.read_string_descriptor_ascii(index).ok())
-            })
-            .unwrap_or_default();
+            .map_err(|error| usb_identity_error(&device, error))?;
+        let serial = read_serial(&device, &handle, &descriptor)?;
         found.push(DeviceInfo {
             serial,
             bus: device.bus_number(),
@@ -154,6 +149,44 @@ pub fn scan() -> Result<Vec<DeviceInfo>> {
         });
     }
     Ok(found)
+}
+
+fn usb_identity_error(device: &rusb::Device<Context>, error: rusb::Error) -> Error {
+    let hint = if error == rusb::Error::Access {
+        "；USB 权限不足，请安装仓库的 99-jcan.rules 并重新插拔设备"
+    } else {
+        ""
+    };
+    Error(format!(
+        "读取 JTool-CAN USB 身份失败（{:03}:{:03}）: {error}{hint}",
+        device.bus_number(),
+        device.address()
+    ))
+}
+
+fn read_serial(
+    device: &rusb::Device<Context>,
+    handle: &DeviceHandle<Context>,
+    descriptor: &rusb::DeviceDescriptor,
+) -> Result<String> {
+    let index = descriptor.serial_number_string_index().ok_or_else(|| {
+        Error(format!(
+            "JTool-CAN {:03}:{:03} 没有序列号描述符",
+            device.bus_number(),
+            device.address()
+        ))
+    })?;
+    let serial = handle
+        .read_string_descriptor_ascii(index)
+        .map_err(|error| usb_identity_error(device, error))?;
+    if serial.is_empty() {
+        return Err(Error(format!(
+            "JTool-CAN {:03}:{:03} 序列号描述符为空",
+            device.bus_number(),
+            device.address()
+        )));
+    }
+    Ok(serial)
 }
 
 pub struct JCan {
@@ -179,14 +212,17 @@ impl JCan {
             let handle = match device.open() {
                 Ok(handle) => handle,
                 Err(error) => {
+                    open_error = Some(usb_identity_error(&device, error));
+                    continue;
+                }
+            };
+            let serial = match read_serial(&device, &handle, &descriptor) {
+                Ok(serial) => serial,
+                Err(error) => {
                     open_error = Some(error);
                     continue;
                 }
             };
-            let serial = descriptor
-                .serial_number_string_index()
-                .and_then(|index| handle.read_string_descriptor_ascii(index).ok())
-                .unwrap_or_default();
             if serial != wanted_serial {
                 continue;
             }
@@ -208,7 +244,7 @@ impl JCan {
             });
         }
         if let Some(error) = open_error {
-            return Err(Error(format!("打开 JTool-CAN 失败: {error}")));
+            return Err(error);
         }
         Err(Error(format!("未找到 JTool-CAN（序列号 {wanted_serial}）")))
     }
@@ -290,23 +326,7 @@ impl JCan {
 
     pub fn receive(&self, timeout: Duration) -> Result<Vec<u8>> {
         let outer = self.read_bulk(EP_STREAM_IN, timeout, true)?;
-        if outer.is_empty() {
-            return Ok(Vec::new());
-        }
-        if outer.len() < 6 {
-            return Err(Error("接收数据包过短".into()));
-        }
-        let length = u16::from_le_bytes([outer[4], outer[5]]) as usize;
-        let body = &outer[6..];
-        if outer[0] != 0x4a
-            || outer[1] != 5
-            || outer[2] != 1
-            || outer[3] != 0xff
-            || body.len() != length
-        {
-            return Err(Error(format!("接收数据包格式错误: {}", hex(&outer))));
-        }
-        Ok(body.to_vec())
+        Ok(stream_payload(&outer)?.to_vec())
     }
 
     pub fn config_get(&self, name: &str, size: usize) -> Result<Vec<u8>> {
@@ -419,6 +439,30 @@ impl Drop for JCan {
         }
         let _ = self.handle.release_interface(0);
     }
+}
+
+fn stream_payload(outer: &[u8]) -> Result<&[u8]> {
+    if outer.is_empty() {
+        return Ok(outer);
+    }
+    if outer.len() < 6 {
+        return Err(Error(format!(
+            "接收数据包过短（实际 {} 字节）: {}",
+            outer.len(),
+            hex(outer)
+        )));
+    }
+    let declared = u16::from_le_bytes([outer[4], outer[5]]) as usize;
+    let body = &outer[6..];
+    if outer[..4] != [0x4a, 5, 1, 0xff] || body.len() != declared {
+        return Err(Error(format!(
+            "接收数据包格式错误（声明 {declared} 字节，实际 {} 字节，差值 {:+}）: {}",
+            body.len(),
+            body.len() as isize - declared as isize,
+            hex(outer)
+        )));
+    }
+    Ok(body)
 }
 
 #[derive(Default)]
@@ -908,6 +952,30 @@ fn u16s(values: &[u16]) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn stream_payload_keeps_strict_lengths_and_raw_evidence() {
+        let old = include_bytes!("../tests/data/receive_20260915.bin");
+        let error = stream_payload(old).unwrap_err().to_string();
+        assert!(error.contains("声明 3072 字节，实际 3648 字节，差值 +576"));
+        assert!(error.ends_with(&hex(old)));
+        assert!(StreamParser::default().feed(&old[6..]).is_empty());
+
+        let valid = packet(5, 0xff, &[1, 2, 3], true);
+        assert_eq!(stream_payload(&valid).unwrap(), [1, 2, 3]);
+        assert!(stream_payload(&[]).unwrap().is_empty());
+        for length in 1..valid.len() {
+            assert!(stream_payload(&valid[..length]).is_err());
+        }
+        let mut extra = valid.clone();
+        extra.push(0);
+        assert!(stream_payload(&extra).is_err());
+        for index in 0..4 {
+            let mut bad_header = valid.clone();
+            bad_header[index] ^= 1;
+            assert!(stream_payload(&bad_header).is_err());
+        }
+    }
 
     #[test]
     fn protocol_roundtrip_and_validation() {

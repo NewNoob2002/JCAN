@@ -15,6 +15,8 @@ mod tui;
 const HELP: &str = r#"JCAN 1.0 native CLI
 
 Usage:
+  jcan [--json] --help | -h | help
+  jcan [--json] COMMAND --help
   jcan [--json] scan
   jcan [--json] self-test
   jcan [--json] --serial SERIAL config-get
@@ -41,6 +43,40 @@ Config fields:
   busoff-recovery 0|1 | auto-retransmission 0|1
   hardware-version ASCII | device-id N
 
+Configuration values (config-get returns raw hexadecimal bytes):
+  can_speed / fd_speed: nominal/data bitrate preset index, NOT a bitrate.
+    Reference mapping below uses zero-based indices from supplied GUI screenshots.
+    Provisional: not individually verified by device readback; firmware may differ.
+
+    Hex   Decimal   can_speed (nominal-speed)   fd_speed (data-speed)
+    00      0          5 kbit/s                  100 kbit/s
+    01      1         10 kbit/s                  125 kbit/s
+    02      2         20 kbit/s                  200 kbit/s
+    03      3         40 kbit/s                  250 kbit/s
+    04      4         50 kbit/s                  300 kbit/s
+    05      5         80 kbit/s                  400 kbit/s
+    06      6        100 kbit/s                  500 kbit/s
+    07      7        125 kbit/s                  600 kbit/s
+    08      8        200 kbit/s                  800 kbit/s
+    09      9        250 kbit/s                    1 Mbit/s
+    0A     10        300 kbit/s                    2 Mbit/s
+    0B     11        400 kbit/s                    3 Mbit/s
+    0C     12        500 kbit/s                    4 Mbit/s
+    0D     13        600 kbit/s                    5 Mbit/s
+    0E     14        800 kbit/s                    6 Mbit/s
+    0F     15          1 Mbit/s                    8 Mbit/s
+
+    fd_speed=06: 500 kbit/s; fd_speed=0A: 2 Mbit/s (reference mapping).
+    To select 2 Mbit/s: config-set data-speed 10 (or data-speed 0x0A).
+  can_customval / fd_customval: five little-endian u16 values:
+    enable, prescaler, SJW, SEG1, SEG2. When enabled, custom timing overrides
+    the corresponding preset. nominal-speed/data-speed disable custom timing.
+  standard / fd-standard: 00 (0) = ISO FD; 01 (1) = Bosch non-ISO FD.
+  term_res, busoff_recovery, auto_retrans: 00 = off; 01 = on.
+  config-set numeric values are decimal, or hexadecimal with a 0x prefix.
+
+Help is available before or after a command without opening USB.
+With --json, help is returned as a JSON object with data.help.
 All IDs, NODE, INDEX, SUBINDEX and BYTE values are hexadecimal.
 Hardware commands require an explicit USB serial number. Capture and periodic work are bounded.
 One-shot send keeps CAN running for 1000 ms by default before CANStop; override with --settle-ms.
@@ -212,11 +248,20 @@ fn output_ok(json: bool, operation: &str, data: &str) {
 }
 
 fn run(mut args: Args) -> Result<()> {
-    let command = args.command()?;
-    if command == "--help" || command == "-h" || command == "help" {
-        print!("{HELP}");
+    if args
+        .values
+        .iter()
+        .any(|value| value == "--help" || value == "-h")
+        || args.values.first().is_some_and(|value| value == "help")
+    {
+        if args.json {
+            output_ok(true, "help", &format!("{{\"help\":{}}}", json_escape(HELP)));
+        } else {
+            print!("{HELP}");
+        }
         return Ok(());
     }
+    let command = args.command()?;
     if command == "--version" || command == "-V" || command == "version" {
         println!("jcan {VERSION}");
         return Ok(());

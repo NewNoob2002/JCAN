@@ -12,6 +12,42 @@ The former Python/MCP implementation is archived under legacy/python-mcp for his
 
 The only system requirement is libusb 1.0. On Linux, install 99-jcan.rules when USB access is denied, then reconnect the adapter.
 
+## Help and configuration values
+
+    target/release/jcan --help
+    target/release/jcan config-set --help
+    target/release/jcan session -h
+    target/release/jcan --json config-get --help
+
+`--help`, `-h`, and `help` show usage without opening USB or requiring a serial
+number. Command-level help shows the same complete reference. With `--json`,
+help is returned in `data.help` inside the usual success response.
+
+`config-get` values are **raw hexadecimal bytes**, not human-readable bitrates:
+
+| Raw field | Meaning |
+| --- | --- |
+| `can_speed` | Nominal/arbitration bitrate preset index |
+| `fd_speed` | CAN FD data bitrate preset index; `06` means preset **6**, not a literal bitrate |
+| `can_customval`, `fd_customval` | Five little-endian `u16` values: enable, prescaler, SJW, SEG1, SEG2; enabled custom timing overrides the corresponding preset |
+| `standard` | `00` = **ISO FD**, `01` = **Bosch non-ISO FD**; set via `config-set fd-standard 0\|1` |
+| `term_res` | `00` = termination off, `01` = on |
+| `busoff_recovery`, `auto_retrans` | `00` = off, `01` = on |
+
+`--help` includes the complete nominal/data preset reference table (`00`–`0F`),
+based on the supplied vendor GUI screenshots with zero-based indices.
+In this provisional mapping, **`fd_speed=06` is 500 kbit/s**, while
+**`fd_speed=0A` (decimal 10) is 2 Mbit/s**; `can_speed=0C` is 500 kbit/s.
+The entries have not been individually verified by device readback and may
+need correction for different firmware. Enabled custom timing overrides presets.
+The bundled vendor tool's `jcanstandard` metadata explicitly states
+`0-ISO; 1-Bosch`, confirming `standard=00` is ISO FD.
+
+`config-set` numeric values are decimal unless prefixed with `0x` (for example,
+`data-speed 6` and `data-speed 0x06` select the same preset). Setting
+`nominal-speed` or `data-speed` disables the respective custom timing.
+These are configuration meanings, not a measurement of physical bus timing.
+
 ## Safe first run
 
     target/release/jcan --json scan
@@ -97,6 +133,6 @@ One-shot CLI send keeps CAN running for 1000 ms after USB acceptance before CANS
 - CAN start, stop, and reboot with re-enumeration verification
 - persistent JSONL session with automatic reconnect
 
-Run target/release/jcan help for exact syntax. Bootloader entry is intentionally excluded. Ctrl-C during capture or periodic transmission performs CANStop before exit.
+Run target/release/jcan --help (or help) for exact syntax. Bootloader entry is intentionally excluded. Ctrl-C during capture or periodic transmission performs CANStop before exit.
 
 Agent authorization and cleanup rules are defined in AGENTS.md.

@@ -568,7 +568,11 @@ fn config_line(config: &Map<String, Value>, raw: bool) -> String {
         preset("can_speed"),
         preset("fd_speed"),
         flag("term_res"),
-        flag("standard"),
+        match value("standard").as_deref() {
+            Some([0]) => "ISO FD",
+            Some([1]) => "Bosch non-ISO FD",
+            _ => "unknown",
+        },
         flag("auto_retrans"),
         flag("busoff_recovery"),
         id
@@ -701,6 +705,19 @@ mod tests {
         let human = config_line(config.as_object().unwrap(), false);
         assert!(human.contains("Nominal preset #12"));
         assert!(human.contains("Device ID 4660"));
+        assert!(human.contains("Data preset #6"));
+        assert!(human.contains("FD-standard Bosch non-ISO FD"));
+        for (raw, expected) in [("00", "ISO FD"), ("02", "unknown")] {
+            let config = json!({"standard": raw});
+            assert!(
+                config_line(config.as_object().unwrap(), false)
+                    .contains(&format!("FD-standard {expected}"))
+            );
+            assert_eq!(
+                config_line(config.as_object().unwrap(), true),
+                format!("STD {raw}")
+            );
+        }
         assert!(suggestions("/sta").contains("/status"));
         assert_eq!(
             level_style(log_text(&json!({"ok":false,"error":"bad"})).0).0,
